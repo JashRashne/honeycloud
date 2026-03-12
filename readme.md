@@ -89,23 +89,39 @@ pytest tests/ -v
 
 ![pytest-local](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773292150/Screenshot_2026-03-12_at_9.41.31_AM_mhvkya.png)
 
-![github-actions-ci](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773292151/Screenshot_2026-03-12_at_9.47.47_AM_ismm62.png)
+![github-actions-ci](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773292446/Screenshot_2026-03-12_at_10.43.57_AM_drxwgx.png)
 
 ---
 
 ## Architecture
 
-```
-[ Decoy Fabric ]  →  [ Kafka / Flink ]  →  [ 3-Layer ML Pipeline ]
-  SSH · SMB · HTTP      stream ETL           ① Anomaly Transformer
-  FTP · RDP · DB        enrichment           ② XGBoost Classifier
-  ICS · Log4Shell       geo-tagging          ③ Bi-LSTM + GAT
-                                                      ↓
-                                          [ Response Engine ]
-                                          Block · Morph · Export STIX
-```
+![architecture](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773316834/PHOTO-2026-03-12-17-15-29_kh6lms.jpg)
 
-> The current release uses a lightweight Isolation Forest scorer as the ML layer. The full 3-layer pipeline above is the planned production architecture.
+**Attacker hits a fake server → event is captured → ML analyzes it → system responds and shares intel.**
+
+### Layer 01 — Deception
+Four fake services running as traps — SSH, SMB/FTP, HTTP, and Database. Each is a real-looking decoy powered by tools like Cowrie and Dionaea. When an attacker connects, every action they take is silently logged as a structured JSON event. They think they're attacking a real server. They're not.
+
+### Layer 02 — Intelligence
+The JSON events flow into **Kafka** (a high-speed event queue) which feeds **Flink** (a stream processor that cleans, enriches, and geo-tags the data). Flink passes the enriched data into the **3-Layer ML Pipeline** which detects, classifies, and predicts the attack. Output is a **Threat Intel Object** — a structured package of everything known about this attacker.
+
+### Layer 03 — Response
+Four things happen simultaneously with that Threat Intel Object:
+- **Response Engine** — blocks the IP, morphs the honeypot, fires a SIEM alert
+- **Data Storage** — saves everything to PostgreSQL, Redis, and S3
+- **Threat Sharing** — exports IOCs to MISP, VirusTotal, AlienVault
+- **Dashboard** — updates the live Grafana attack map and kill chain view
+
+### The ML Pipeline
+A zoom-in on the intelligence brain:
+- **Layer 0** — takes 6 behavioral features per connection as input
+- **Layer 1 — Detect** — Isolation Forest + Anomaly Transformer scores how anomalous the event is. Score below 0.5 gets discarded. Above 0.5 moves forward.
+- **Layer 2 — Classify** — XGBoost + Random Forest ensemble labels the attack type and tags it to a MITRE ATT&CK technique
+- **Layer 3 — Predict** — Bi-LSTM predicts the next attack move. GAT connects related IPs into campaign clusters
+- **Layer X — Output** — a clean JSON object with attack type, confidence, MITRE ID, next vector prediction, and campaign ID ready for export
+
+> A raw TCP connection enters Layer 01 and exits Layer X as attributed, classified, predicted threat intelligence.
+> The current release implements Layer 01 (Cowrie deploy) and a lightweight Isolation Forest for Layer 1 — Detect. The full pipeline is the planned production architecture.
 
 ---
 
