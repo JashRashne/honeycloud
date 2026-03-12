@@ -2,7 +2,7 @@ import click
 from honeycloud import deploy, monitor, score
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="honeycloud")
+@click.version_option(version="0.1.1", prog_name="honeycloud")
 def main():
     """
     \b
