@@ -18,9 +18,11 @@ BANNER = """
 def _check_docker():
     try:
         subprocess.run(["docker", "info"], capture_output=True, check=True)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+        return True, None
+    except FileNotFoundError:
+        return False, "Docker is not installed or not in PATH."
+    except subprocess.CalledProcessError:
+        return False, "Docker is installed but the daemon is not running. Please start Docker Desktop."
 
 def run(mock: bool = False, port: int = 2222):
     print(BANNER)
@@ -30,6 +32,10 @@ def run(mock: bool = False, port: int = 2222):
     if mock:
         _run_mock(port)
     else:
+        ok, err = _check_docker()
+        if not ok:
+            click.echo(click.style(f"\n  ✗ {err}\n  Use --mock to run without Docker.\n", fg="red"))
+            sys.exit(1)
         _run_docker(port)
 
 def _run_mock(port: int):
@@ -63,14 +69,36 @@ def _run_mock(port: int):
   Run \033[93mhoneycloud monitor --live\033[0m to watch incoming attacks.
 """)
 
-def _run_docker(port: int):
-    if not _check_docker():
-        click.echo(click.style(
-            "\n  ✗ Docker not found. Use --mock to run without Docker.\n",
-            fg="red"
-        ))
-        sys.exit(1)
+def _container_exists() -> str | None:
+    """Returns container status ('running', 'exited', etc.) or None if it doesn't exist."""
+    result = subprocess.run(
+        ["docker", "inspect", "--format", "{{.State.Status}}", "honeycloud-cowrie"],
+        capture_output=True, text=True
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return None
 
+def _run_docker(port: int):
+    status = _container_exists()
+
+    if status == "running":
+        click.echo(click.style(
+            "\n  ✔  Honeypot is already running. Run: honeycloud monitor\n", fg="green"
+        ))
+        return
+
+    if status == "exited":
+        click.echo(f"\n  Restarting existing container on port \033[93m{port}\033[0m...\n")
+        try:
+            subprocess.run(["docker", "start", "honeycloud-cowrie"], check=True)
+            click.echo(click.style(f"\n  ✔  Honeypot restarted on port {port}. Run: honeycloud monitor\n", fg="green"))
+        except subprocess.CalledProcessError as e:
+            click.echo(click.style(f"\n  ✗  Docker error: {e}\n", fg="red"))
+            sys.exit(1)
+        return
+
+    # No container exists yet — fresh deploy
     click.echo(f"\n  Pulling Cowrie honeypot image: \033[93m{COWRIE_IMAGE}\033[0m\n")
     try:
         subprocess.run(["docker", "pull", COWRIE_IMAGE], check=True)
