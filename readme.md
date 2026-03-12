@@ -95,7 +95,7 @@ pytest tests/ -v
 
 ## Architecture
 
-![architecture](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773316834/PHOTO-2026-03-12-17-15-29_kh6lms.jpg)
+![architecture](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773338529/PHOTO-2026-03-12-23-31-22_whgge3.jpg)
 
 **Attacker hits a fake server → event is captured → ML analyzes it → system responds and shares intel.**
 
@@ -113,6 +113,9 @@ Four things happen simultaneously with that Threat Intel Object:
 - **Dashboard** — updates the live Grafana attack map and kill chain view
 
 ### The ML Pipeline
+
+![ml-pipeline](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773338531/PHOTO-2026-03-12-23-31-05_rkz8aw.jpg)
+
 A zoom-in on the intelligence brain:
 - **Layer 0** — takes 6 behavioral features per connection as input
 - **Layer 1 — Detect** — Isolation Forest + Anomaly Transformer scores how anomalous the event is. Score below 0.5 gets discarded. Above 0.5 moves forward.
