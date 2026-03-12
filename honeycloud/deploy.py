@@ -1,6 +1,7 @@
 import time
 import subprocess
 import sys
+from typing import Optional
 import click
 
 COWRIE_IMAGE = "cowrie/cowrie:latest"
@@ -69,7 +70,7 @@ def _run_mock(port: int):
   Run \033[93mhoneycloud monitor --live\033[0m to watch incoming attacks.
 """)
 
-def _container_exists() -> str | None:
+def _container_exists() -> Optional[str]:
     """Returns container status ('running', 'exited', etc.) or None if it doesn't exist."""
     result = subprocess.run(
         ["docker", "inspect", "--format", "{{.State.Status}}", "honeycloud-cowrie"],
