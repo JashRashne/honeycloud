@@ -6,3 +6,6 @@ data/datasets
 # macOS
 .DS_Store
 **/.DS_Store
+
+data/cowrie-logs/
+data/cowrie-logs/*
