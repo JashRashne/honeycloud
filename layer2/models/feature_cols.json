@@ -1,0 +1,1 @@
+["dst_port", "src_port", "hour", "day_of_week", "dst_port_bucket", "src_port_bucket", "inter_arrival_sec", "conn_count", "port_entropy", "proto_diversity", "proto_epmapper", "proto_ftpd", "proto_httpd", "proto_mongod", "proto_mqttd", "proto_mssqld", "proto_mysqld", "proto_pptpd", "proto_smbd"]
