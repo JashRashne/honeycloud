@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "honeycloud"
-version = "0.1.2"
+version = "0.1.3"
 description = "Adaptive cloud honeypot platform — deploy decoys, monitor attacks, score threats with ML"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,15 +23,20 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "click>=8.1",
+    "scikit-learn>=1.6",
+    "xgboost>=2.0",
+    "joblib>=1.3",
+    "numpy>=1.24",
+
 ]
 
 [project.scripts]
 honeycloud = "honeycloud.cli:main"
 
 [project.urls]
-Homepage   = "https://github.com/YOUR_USERNAME/honeycloud"
-Repository = "https://github.com/YOUR_USERNAME/honeycloud"
-Issues     = "https://github.com/YOUR_USERNAME/honeycloud/issues"
+Homepage   = "https://github.com/JashRashne/honeycloud"
+Repository = "https://github.com/JashRashne/honeycloud"
+Issues     = "https://github.com/JashRashne/honeycloud/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
