@@ -9,6 +9,8 @@
 
 HoneyCloud is a CLI tool that deploys a real SSH honeypot (via [Cowrie](https://github.com/cowrie/cowrie) + Docker), monitors incoming attack events with MITRE ATT&CK tagging, and scores attacker IPs using a lightweight Isolation Forest anomaly detector.
 
+> **Note:** The project is currently under active development. In order to access the working mock model, you can clone the repository, checkout commit `9389734dea24b06aa3f13a45337b46f164f7d735`, and follow the instructions in the README at that specific commit.
+
 ---
 
 ## Install
