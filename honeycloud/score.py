@@ -7,7 +7,8 @@ import numpy as np
 #  Model paths
 # ─────────────────────────────────────────────
 _HERE        = os.path.dirname(__file__)
-_MODELS_DIR  = os.path.join(_HERE, "..", "layer2", "models")
+_MODELS_DIR  = os.path.join(_HERE, "models")
+
 
 MODEL_PATHS = {
     "isolation_forest"  : os.path.join(_MODELS_DIR, "isolation_forest.pkl"),

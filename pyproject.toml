@@ -43,4 +43,5 @@ where = ["."]
 include = ["honeycloud*"]
 
 [tool.setuptools.package-data]
-honeycloud = ["../data/*.csv"]
+honeycloud = ["models/*.pkl", "models/*.json"]
+
