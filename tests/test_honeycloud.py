@@ -14,7 +14,7 @@ class TestCLI:
     def test_version(self):
         result = self.runner.invoke(main, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.3" in result.output
+        assert "0.1.6" in result.output
 
     def test_deploy_mock(self):
         result = self.runner.invoke(main, ["deploy", "--mock"])
