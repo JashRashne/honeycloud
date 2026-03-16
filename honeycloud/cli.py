@@ -4,7 +4,7 @@ from honeycloud import monitor as monitor_mod
 from honeycloud import score as score_mod
 
 @click.group()
-@click.version_option(version="0.1.6", prog_name="honeycloud")
+@click.version_option(version="0.1.7", prog_name="honeycloud")
 def main():
     """
     \b

@@ -19,6 +19,10 @@ MODEL_PATHS = {
     "label_encoder"     : os.path.join(_MODELS_DIR, "label_encoder.pkl"),
     "feature_cols"      : os.path.join(_MODELS_DIR, "flow_feature_cols.json"),
     "hornet40_baseline" : os.path.join(_MODELS_DIR, "hornet40_baseline.json"),
+    "bilstm"            : os.path.join(_MODELS_DIR, "bilstm_model.keras"),
+    "lstm_scaler"       : os.path.join(_MODELS_DIR, "lstm_scaler.pkl"),
+    "lstm_le"           : os.path.join(_MODELS_DIR, "lstm_label_encoder.pkl"),
+    "bilstm_onnx" : os.path.join(_MODELS_DIR, "bilstm_model.onnx"),
 }
 
 _CACHE = {}
@@ -36,10 +40,25 @@ def _load_models() -> bool:
             _CACHE["feature_cols"] = json.load(f)
         with open(MODEL_PATHS["hornet40_baseline"]) as f:
             _CACHE["baseline"] = json.load(f)
-        return True
+        # NEW ↓ — LSTM is optional, won't crash score if files missing
+        try:
+            import onnxruntime as ort
+            sess = ort.InferenceSession(
+                MODEL_PATHS["bilstm_onnx"],
+                providers=["CPUExecutionProvider"]
+            )
+            _CACHE["lstm"]        = sess
+            _CACHE["lstm_scaler"] = joblib.load(MODEL_PATHS["lstm_scaler"])
+            _CACHE["lstm_le"]     = joblib.load(MODEL_PATHS["lstm_le"])
+        except Exception:
+            _CACHE["lstm"] = None
+        return True          # ← this line must be here
+
+
     except Exception as e:
         _CACHE["error"] = str(e)
         return False
+    
 
 KNOWN_MALICIOUS = {
     "45.33.32.156":    ("RU",  "Known SSH bruteforcer — Shodan crawler ASN"),
@@ -155,7 +174,6 @@ def _threat_label(score: float) -> tuple:
     if score >= 0.40: return ("MEDIUM",   "cyan",   "🟡")
     return                    ("LOW",      "green",  "🟢")
 
-
 def run(ip: str, session_data: dict = None):
     click.echo(click.style(
         "\n  🍯 HoneyCloud — Threat Scoring Engine",
@@ -181,7 +199,7 @@ def run(ip: str, session_data: dict = None):
     raw_score     = _CACHE["iso"].decision_function(X)[0]
     anomaly_score = float(np.clip(0.5 - raw_score, 0.0, 1.0))
 
-    click.echo(click.style("  [4/4] Classifying attack type...\n", fg="bright_black"))
+    click.echo(click.style("  [4/4] Classifying attack type...", fg="bright_black"))
     xgb_probs   = _CACHE["xgb"].predict_proba(X)[0]
     rf_probs    = _CACHE["rf"].predict_proba(X)[0]
     ensemble    = (xgb_probs + rf_probs) / 2
@@ -189,6 +207,30 @@ def run(ip: str, session_data: dict = None):
     confidence  = float(ensemble[pred_idx])
     attack_type = _CACHE["le"].inverse_transform([pred_idx])[0]
 
+    # ── Bi-LSTM: predict next move (ONNX) ────────
+    next_moves = []
+    if _CACHE.get("lstm") is not None:
+        click.echo(click.style("  [5/4] Predicting next move (Bi-LSTM)...", fg="bright_black"))
+        try:
+            SEQ_LEN   = 5
+            feat_cols = _CACHE["feature_cols"]
+            single    = np.array([features.get(c, 0.0) for c in feat_cols],
+                                 dtype=np.float32)
+            X_seq     = _CACHE["lstm_scaler"].transform(
+                            np.tile(single, (SEQ_LEN, 1))
+                        ).reshape(1, SEQ_LEN, len(feat_cols)).astype(np.float32)
+
+            sess      = _CACHE["lstm"]
+            inp_name  = sess.get_inputs()[0].name
+            probs     = sess.run(None, {inp_name: X_seq})[0][0]
+            top2_idx  = np.argsort(probs)[::-1][:2]
+            classes   = _CACHE["lstm_le"].classes_
+            next_moves = [(classes[i], float(probs[i])) for i in top2_idx]
+        except Exception as e:
+            click.echo(click.style(f"  [LSTM] skipped: {e}", fg="bright_black"))
+    click.echo()
+
+    # ── Adjust anomaly score ─────────────────────
     known = KNOWN_MALICIOUS.get(ip)
     if known:
         anomaly_score = min(anomaly_score + 0.25, 1.0)
@@ -207,12 +249,13 @@ def run(ip: str, session_data: dict = None):
         pass
 
     label, color, icon = _threat_label(anomaly_score)
-    baseline           = _CACHE["baseline"]
+    baseline            = _CACHE["baseline"]
 
     bar_filled = int(anomaly_score * 30)
     bar = (click.style("█" * bar_filled, fg=color) +
            click.style("░" * (30 - bar_filled), fg="bright_black"))
 
+    # ── Main output ──────────────────────────────
     click.echo(f"  {'─'*54}")
     click.echo(f"  IP Address    : {click.style(ip, fg='cyan')}")
     click.echo(f"  Anomaly Score : {bar}  "
@@ -227,31 +270,44 @@ def run(ip: str, session_data: dict = None):
         click.echo(f"  Intel Match   : "
                    f"{click.style(known[1], fg='red')}  [{known[0]}]")
 
+    # ── Next move prediction ─────────────────────
+    if next_moves:
+        click.echo(f"\n  {click.style('Predicted Next Move (Bi-LSTM):', fg='bright_black')}")
+        for rank, (cls, prob) in enumerate(next_moves):
+            bar_w    = int(prob * 30)
+            prob_bar = (click.style("█" * bar_w,        fg="magenta") +
+                        click.style("░" * (30 - bar_w), fg="bright_black"))
+            click.echo(f"    #{rank+1}  {cls:<20} {prob_bar}  {prob:.1%}")
+
+    # ── MITRE ATT&CK ─────────────────────────────
     mitre_techs = MITRE_MAP.get(attack_type, [])
     if mitre_techs:
         click.echo(f"\n  {click.style('MITRE ATT&CK:', fg='bright_black')}")
         for tid, tname in mitre_techs:
             click.echo(f"    {click.style(tid, fg='magenta')}  {tname}")
 
+    # ── Flow feature breakdown ────────────────────
     click.echo(f"\n  {click.style('Flow Feature Breakdown:', fg='bright_black')}")
     for lbl, val in [
-        ("Target port",          features["dst_port"]),
-        ("Packet count",         features["packet_count"]),
-        ("Flow duration (sec)",  features["flow_duration_sec"]),
-        ("Bytes per packet",     features["bytes_per_packet"]),
-        ("SYN ratio",            features["syn_ratio"]),
-        ("RST ratio",            features["rst_ratio"]),
-        ("SYN scan detected",    features["is_syn_scan"]),
+        ("Target port",         features["dst_port"]),
+        ("Packet count",        features["packet_count"]),
+        ("Flow duration (sec)", features["flow_duration_sec"]),
+        ("Bytes per packet",    features["bytes_per_packet"]),
+        ("SYN ratio",           features["syn_ratio"]),
+        ("RST ratio",           features["rst_ratio"]),
+        ("SYN scan detected",   features["is_syn_scan"]),
     ]:
         click.echo(f"    {lbl:<26}: "
                    f"{click.style(str(round(val, 3)), fg='yellow')}")
 
+    # ── Hornet40 baseline ─────────────────────────
     click.echo(f"\n  {click.style('Hornet40 Geo Baseline:', fg='bright_black')}")
     click.echo(f"    Normal range  : 0 — "
                f"{click.style(str(round(baseline['threshold'])), fg='green')} flows/hr")
     click.echo(f"    Global mean   : "
                f"{click.style(str(round(baseline['mean'], 1)), fg='white')} flows/hr")
     click.echo(f"\n  {'─'*54}\n")
+
 
 
 def _run_heuristic(ip: str):

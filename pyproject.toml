@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "honeycloud"
-version = "0.1.6"
+version = "0.1.7"
 description = "Adaptive cloud honeypot platform — deploy decoys, monitor attacks, score threats with ML"
 readme = "README.md"
 license = { text = "MIT" }
@@ -27,6 +27,7 @@ dependencies = [
     "xgboost>=2.0",
     "joblib>=1.3",
     "numpy>=1.24",
+    "onnxruntime>=1.17",
 
 ]
 
