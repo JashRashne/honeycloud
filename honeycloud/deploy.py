@@ -104,13 +104,24 @@ def _run_docker(port: int):
     try:
         subprocess.run(["docker", "pull", COWRIE_IMAGE], check=True)
         click.echo(f"\n  Launching Cowrie on port \033[93m{port}\033[0m...\n")
+        
+        # create local log dir
+        import os
+        log_dir = os.path.join(os.getcwd(), "data", "cowrie-logs")
+        os.makedirs(log_dir, exist_ok=True)
+
+        import platform
+        network_args = ["--network", "none"] if platform.system() == "Linux" else []
+
         subprocess.run([
             "docker", "run", "-d",
             "--name", "honeycloud-cowrie",
-            "--network", "none",          # zero egress — attackers can't pivot out
+            *network_args,
             "-p", f"{port}:2222",
+            "-v", f"{log_dir}:/cowrie/cowrie-git/var/log/cowrie",
             COWRIE_IMAGE
         ], check=True)
+
         click.echo(click.style(f"\n  ✔  Honeypot live on port {port}. Run: honeycloud monitor\n", fg="green"))
     except subprocess.CalledProcessError as e:
         click.echo(click.style(f"\n  ✗  Docker error: {e}\n  Try --mock mode.\n", fg="red"))

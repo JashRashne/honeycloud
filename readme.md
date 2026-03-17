@@ -97,7 +97,7 @@ pytest tests/ -v
 
 ## Architecture
 
-![architecture](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773338529/PHOTO-2026-03-12-23-31-22_whgge3.jpg)
+![architecture](https://res.cloudinary.com/dgbgxtsrl/image/upload/v1773778513/PHOTO-2026-03-18-01-45-01_idpjwz.jpg)
 
 **Attacker hits a fake server → event is captured → ML analyzes it → system responds and shares intel.**
 
