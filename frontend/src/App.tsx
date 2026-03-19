@@ -1,12 +1,15 @@
-import './App.css'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Dashboard } from './pages/Dashboard'
+import { IPLookup } from './pages/IPLookup'
 
-function App() {
-
+export default function App() {
   return (
-    <div className='h-screen w-screen bg-black text-white'>
-TEST
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/ip/:ip" element={<IPLookup />} />
+        <Route path="/ip" element={<IPLookup />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
-
-export default App
