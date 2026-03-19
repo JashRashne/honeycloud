@@ -7,6 +7,7 @@
 #   python -m honeycloud.collector                  # production
 #   python -m honeycloud.collector --mock           # local test
 #   python -m honeycloud.collector --db-url <url>   # custom DB
+#   python -m honeycloud.collector --from-start     # reprocess entire file
 # ─────────────────────────────────────────────────────────────
 
 import os
@@ -32,7 +33,6 @@ DEFAULT_LOG_CANDIDATES = [
     "data/cowrie-logs/cowrie/cowrie.json",       # local alt path
 ]
 
-
 DEFAULT_DB_URL = os.environ.get(
     "HONEYCLOUD_DB_URL",
     "postgresql://honeycloud:honeycloud@localhost:5432/honeycloud"
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS attacks (
     id              SERIAL PRIMARY KEY,
     src_ip          TEXT NOT NULL,
     timestamp       TIMESTAMPTZ NOT NULL,
-    event_type      TEXT NOT NULL,       -- login_failed, login_success, command, connect
+    event_type      TEXT NOT NULL,
     username        TEXT,
     password        TEXT,
     command         TEXT,
@@ -54,9 +54,9 @@ CREATE TABLE IF NOT EXISTS attacks (
     mitre_id        TEXT,
     mitre_name      TEXT,
     severity        TEXT,
-    attack_type     TEXT,               -- from XGBoost+RF
-    anomaly_score   FLOAT,              -- from Isolation Forest
-    next_move_1     TEXT,               -- top Bi-LSTM prediction
+    attack_type     TEXT,
+    anomaly_score   FLOAT,
+    next_move_1     TEXT,
     next_move_1_prob FLOAT,
     next_move_2     TEXT,
     next_move_2_prob FLOAT,
@@ -173,15 +173,14 @@ def _score_ip(ip: str) -> dict:
             classes   = _CACHE["lstm_le"].classes_
             next_moves = [(classes[i], float(probs[i])) for i in top2]
 
-        result = {
-            "anomaly_score" : anomaly_score,
-            "attack_type"   : attack_type,
-            "next_move_1"   : next_moves[0][0] if len(next_moves) > 0 else None,
+        return {
+            "anomaly_score"   : anomaly_score,
+            "attack_type"     : attack_type,
+            "next_move_1"     : next_moves[0][0] if len(next_moves) > 0 else None,
             "next_move_1_prob": next_moves[0][1] if len(next_moves) > 0 else None,
-            "next_move_2"   : next_moves[1][0] if len(next_moves) > 1 else None,
+            "next_move_2"     : next_moves[1][0] if len(next_moves) > 1 else None,
             "next_move_2_prob": next_moves[1][1] if len(next_moves) > 1 else None,
         }
-        return result
 
     except Exception as e:
         log.warning(f"Scoring failed for {ip}: {e}")
@@ -345,9 +344,7 @@ def _upsert_session(conn, event: dict, session_state: dict):
 
 
 # ─────────────────────────────────────────────
-#  Score cache — don't re-score same IP twice
-#  per run (expensive, and same IP = same synth
-#  features for now)
+#  Score cache
 # ─────────────────────────────────────────────
 _score_cache: dict = {}
 
@@ -369,62 +366,131 @@ INTERESTING_EVENTS = {
     "cowrie.client.kex",
 }
 
-def tail_and_collect(log_path: str, conn, dry_run: bool = False):
+# How often to print the heartbeat when idle (seconds)
+HEARTBEAT_INTERVAL = 30
+
+
+def tail_and_collect(log_path: str, conn, dry_run: bool = False,
+                     from_start: bool = False):
     """
-    Tail cowrie.json from the end, process new lines as they arrive.
-    dry_run=True prints to stdout without writing to DB.
+    Tail cowrie.json and process new lines as they arrive.
+
+    FIX vs original:
+    - Tracks the current read position explicitly (last_pos) instead of
+      relying on readline() blocking behaviour, which missed lines when
+      Cowrie flushed late or the file was written in bursts.
+    - Detects file rotation: if the file shrinks (inode replaced) the
+      handle is reopened from the start of the new file.
+    - Heartbeat log every HEARTBEAT_INTERVAL seconds so you can confirm
+      the collector is alive even when no events are arriving.
+    - --from-start flag to reprocess the entire existing file on startup
+      (useful for debugging; omit in production).
     """
     log.info(f"📂 Tailing: {log_path}")
     log.info(f"💾 DB write: {'disabled (dry run)' if dry_run else 'enabled'}")
+    if from_start:
+        log.info("⏪ --from-start: reprocessing entire file")
 
-    session_state: dict = {}
-    events_processed    = 0
-    events_written      = 0
+    session_state: dict  = {}
+    events_processed     = 0
+    events_written       = 0
+    last_heartbeat       = time.time()
 
-    with open(log_path, "r") as f:
-        # seek to end — only process new events
-        f.seek(0, 2)
-        log.info("✅ Collector running — waiting for events...")
+    def _open_file(seek_end: bool):
+        f = open(log_path, "r")
+        if seek_end:
+            f.seek(0, 2)          # jump to EOF
+        pos = f.tell()
+        inode = os.fstat(f.fileno()).st_ino
+        log.info(f"✅ Collector running — watching from byte {pos} "
+                 f"(inode {inode})")
+        return f, pos, inode
 
+    f, last_pos, current_inode = _open_file(seek_end=not from_start)
+
+    try:
         while True:
-            line = f.readline()
-            if not line:
-                time.sleep(0.5)
+            # ── rotation check ──────────────────────────────────────────
+            # If the file on disk has a different inode (logrotate / Cowrie
+            # restart), reopen it from the beginning.
+            try:
+                disk_inode = os.stat(log_path).st_ino
+                if disk_inode != current_inode:
+                    log.info("🔄 File rotated — reopening")
+                    f.close()
+                    f, last_pos, current_inode = _open_file(seek_end=False)
+            except FileNotFoundError:
+                # file temporarily missing during rotation — wait and retry
+                time.sleep(1)
                 continue
 
-            event = _parse_event(line)
-            if not event:
-                continue
+            # ── read new content ────────────────────────────────────────
+            # Seek to last known position first. This is the key fix:
+            # readline() on a file that hasn't grown returns "" immediately,
+            # so without re-seeking we'd drift or miss content written
+            # between polls.
+            f.seek(last_pos)
+            new_content = f.read()          # read everything since last_pos
 
-            eid = event.get("eventid", "")
-            if eid not in INTERESTING_EVENTS:
-                continue
+            if new_content:
+                last_pos = f.tell()         # advance our bookmark
+                lines = new_content.splitlines()
 
-            events_processed += 1
-            src_ip = event.get("src_ip", "unknown")
+                for line in lines:
+                    event = _parse_event(line)
+                    if not event:
+                        continue
 
-            # score (cached per IP)
-            scoring = _get_score(src_ip)
+                    eid = event.get("eventid", "")
+                    if eid not in INTERESTING_EVENTS:
+                        continue
 
-            if dry_run:
-                ts = event.get("timestamp", "")[:19]
-                log.info(
-                    f"  {ts}  {eid:<30}  {src_ip:<18}"
-                    f"  score={scoring.get('anomaly_score', '?'):.2f}"
-                    f"  type={scoring.get('attack_type', '?')}"
-                    if scoring else
-                    f"  {ts}  {eid:<30}  {src_ip:<18}  (no scoring)"
-                )
+                    events_processed += 1
+                    src_ip = event.get("src_ip", "unknown")
+                    scoring = _get_score(src_ip)
+
+                    if dry_run:
+                        ts = event.get("timestamp", "")[:19]
+                        score_str = (
+                            f"score={scoring.get('anomaly_score', 0):.2f}"
+                            f"  type={scoring.get('attack_type', '?')}"
+                            if scoring else "(no scoring)"
+                        )
+                        log.info(f"  {ts}  {eid:<30}  {src_ip:<18}  {score_str}")
+                    else:
+                        try:
+                            _insert_attack(conn, event, scoring)
+                            _upsert_session(conn, event, session_state)
+                            events_written += 1
+                            log.info(
+                                f"✍️  {eid:<30}  {src_ip:<18}"
+                                f"  score={scoring.get('anomaly_score', 0):.2f}"
+                                f"  type={scoring.get('attack_type', '?')}"
+                            )
+                        except Exception as e:
+                            log.error(f"DB write failed: {e}")
+
+                    if events_processed % 100 == 0:
+                        log.info(
+                            f"📊 Processed: {events_processed}  "
+                            f"Written: {events_written}"
+                        )
             else:
-                try:
-                    _insert_attack(conn, event, scoring)
-                    _upsert_session(conn, event, session_state)
-                    events_written += 1
-                except Exception as e:
-                    log.error(f"DB write failed: {e}")
+                # No new content — sleep briefly before next poll
+                time.sleep(0.5)
 
-            if events_processed % 100 == 0:
-                log.info(f"📊 Processed: {events_processed}  Written: {events_written}")
+            # ── heartbeat ───────────────────────────────────────────────
+            now = time.time()
+            if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+                log.info(
+                    f"💓 Alive — processed={events_processed}  "
+                    f"written={events_written}  "
+                    f"watching_byte={last_pos}"
+                )
+                last_heartbeat = now
+
+    finally:
+        f.close()
 
 
 # ─────────────────────────────────────────────
@@ -432,10 +498,13 @@ def tail_and_collect(log_path: str, conn, dry_run: bool = False):
 # ─────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="HoneyCloud Collector")
-    parser.add_argument("--log-path", help="Path to cowrie.json")
-    parser.add_argument("--db-url",   default=DEFAULT_DB_URL, help="PostgreSQL URL")
-    parser.add_argument("--dry-run",  action="store_true",
+    parser.add_argument("--log-path",   help="Path to cowrie.json")
+    parser.add_argument("--db-url",     default=DEFAULT_DB_URL,
+                        help="PostgreSQL URL")
+    parser.add_argument("--dry-run",    action="store_true",
                         help="Print events without writing to DB")
+    parser.add_argument("--from-start", action="store_true",
+                        help="Reprocess the entire existing log file on startup")
     args = parser.parse_args()
 
     # find log file
@@ -455,17 +524,17 @@ def main():
 
     if args.dry_run:
         log.info("🧪 Dry run mode — no DB writes")
-        tail_and_collect(log_path, conn=None, dry_run=True)
+        tail_and_collect(log_path, conn=None, dry_run=True,
+                         from_start=args.from_start)
         return
 
-    # connect to DB
-    log.info(f"🔌 Connecting to DB...")
+    log.info("🔌 Connecting to DB...")
     conn = _connect(args.db_url)
     _ensure_schema(conn)
 
-    # run forever
     try:
-        tail_and_collect(log_path, conn, dry_run=False)
+        tail_and_collect(log_path, conn, dry_run=False,
+                         from_start=args.from_start)
     except KeyboardInterrupt:
         log.info("Collector stopped.")
     finally:

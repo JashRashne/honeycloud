@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "honeycloud"
-version = "0.1.7"
+version = "0.1.8"
 description = "Adaptive cloud honeypot platform — deploy decoys, monitor attacks, score threats with ML"
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,7 +28,7 @@ dependencies = [
     "joblib>=1.3",
     "numpy>=1.24",
     "onnxruntime>=1.17",
-
+    "uvicorn[standard]>=0.27",
 ]
 
 [project.scripts]
@@ -44,5 +44,4 @@ where = ["."]
 include = ["honeycloud*"]
 
 [tool.setuptools.package-data]
-honeycloud = ["models/*.pkl", "models/*.json"]
-
+honeycloud = ["models/*.pkl", "models/*.json", "models/*.onnx"]
