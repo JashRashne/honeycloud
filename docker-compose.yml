@@ -1,0 +1,78 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  postgres:
+    image: postgres:15
+    container_name: honeycloud-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: honeycloud
+      POSTGRES_PASSWORD: honeycloud
+      POSTGRES_DB: honeycloud
+    ports:
+      - "5432:5432"
+    volumes:
+      - honeycloud-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U honeycloud"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Cowrie SSH Honeypot ─────────────────────────────────────
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: honeycloud-cowrie
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    volumes:
+      - cowrie-logs:/cowrie/var/log/cowrie
+    environment:
+      - COWRIE_TELNET_ENABLED=no
+
+  # ── Collector ───────────────────────────────────────────────
+  collector:
+    build: .
+    container_name: honeycloud-collector
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cowrie:
+        condition: service_started
+    environment:
+      HONEYCLOUD_DB_URL: postgresql://honeycloud:honeycloud@postgres:5432/honeycloud
+    volumes:
+      - cowrie-logs:/app/data/cowrie-logs
+      - ./honeycloud:/app/honeycloud
+    command: >
+      honeycloud collect
+      --log-path /app/data/cowrie-logs/cowrie.json
+      --db-url postgresql://honeycloud:honeycloud@postgres:5432/honeycloud
+
+  # ── FastAPI ─────────────────────────────────────────────────
+  api:
+    build: .
+    container_name: honeycloud-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      HONEYCLOUD_DB_URL: postgresql://honeycloud:honeycloud@postgres:5432/honeycloud
+    volumes:
+      - ./honeycloud:/app/honeycloud
+      - ./api:/app/api
+    command: >
+      honeycloud serve
+      --host 0.0.0.0
+      --port 8000
+
+volumes:
+  honeycloud-pgdata:
+    name: honeycloud-pgdata
+  cowrie-logs:
+    name: honeycloud-cowrie-logs

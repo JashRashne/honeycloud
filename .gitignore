@@ -10,3 +10,5 @@ data/datasets
 data/cowrie-logs/
 data/cowrie-logs/*
 layer2/models/*.pkl
+
+.env

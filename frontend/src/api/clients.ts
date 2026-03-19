@@ -1,7 +1,9 @@
 import axios from 'axios'
 import type { Attack, Session, SessionDetail, TopIP, Stats, ScoreResult, HealthStatus } from '../types'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
+})
 
 export const getHealth = () =>
   api.get<HealthStatus>('/health').then(r => r.data)
