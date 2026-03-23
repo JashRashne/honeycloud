@@ -1,80 +1,123 @@
+import { useEffect, useRef } from 'react'
 import type { Stats, Attack } from '../types'
 
-const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
-
-interface Props {
-  stats: Stats | null
-  attacks: Attack[]
-}
-
-function Card({
-  label,
-  value,
-  sub,
-  accent,
-}: {
+interface CardProps {
   label: string
   value: string | number
   sub?: string
-  accent?: 'red' | 'amber' | 'emerald' | 'stone'
-}) {
-  const ring: Record<string, string> = {
-    red:     'border-l-red-500',
-    amber:   'border-l-amber-400',
-    emerald: 'border-l-emerald-500',
-    stone:   'border-l-stone-300',
-  }
+  accent: string
+  index: number
+  mono?: boolean
+}
+
+function TacCard({ label, value, sub, accent, index, mono }: CardProps) {
+  const prevValRef = useRef<string | number>(value)
+  const flashRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (prevValRef.current !== value && flashRef.current) {
+      flashRef.current.style.animation = 'none'
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      flashRef.current.offsetHeight // reflow
+      flashRef.current.style.animation = 'panel-wake 0.5s ease forwards'
+    }
+    prevValRef.current = value
+  }, [value])
+
   return (
-    <div className={`bg-white border border-stone-200 rounded-lg p-5 border-l-4 ${ring[accent ?? 'stone']}`}>
-      <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold mb-2">{label}</p>
-      <p className="text-3xl font-bold text-stone-900 tabular-nums leading-none">{value}</p>
-      {sub && <p className="text-xs text-stone-400 mt-1.5 font-mono">{sub}</p>}
+    <div
+      ref={flashRef}
+      style={{
+        background: 'var(--void-2)',
+        border: '1px solid var(--void-4)',
+        borderTop: `2px solid ${accent}`,
+        borderRadius: 2,
+        padding: '22px 24px',
+        position: 'relative',
+        overflow: 'hidden',
+        animation: `fade-in-up 0.4s ease ${index * 0.07}s both`,
+      }}
+    >
+      {/* Bg radial */}
+      <div style={{
+        position: 'absolute', top: -20, right: -20,
+        width: 120, height: 120,
+        background: `radial-gradient(circle, ${accent}12 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 14 }}>
+        {label}
+      </div>
+      <div style={{
+        fontFamily: mono ? 'var(--font-mono)' : 'var(--font-display)',
+        fontWeight: 800,
+        fontSize: mono ? 24 : 34,
+        color: 'var(--antiquity)',
+        lineHeight: 1,
+        letterSpacing: mono ? '0.01em' : '-0.02em',
+        marginBottom: 10,
+      }}>
+        {value}
+      </div>
+      {sub && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)' }}>
+          {sub}
+        </div>
+      )}
+
+      {/* Tiny accent line bottom-left */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0,
+        width: 40, height: 1,
+        background: accent, opacity: 0.4,
+      }} />
     </div>
   )
 }
 
-export function MetricCards({ stats, attacks }: Props) {
+export function MetricCards({ stats, attacks }: { stats: Stats | null; attacks: Attack[] }) {
   const totalEvents = stats?.by_event_type.reduce((s, r) => s + r.count, 0) ?? 0
-
   const criticalCount = stats?.by_severity.find(r => r.severity === 'CRITICAL')?.count ?? 0
-  const highCount     = stats?.by_severity.find(r => r.severity === 'HIGH')?.count ?? 0
-
+  const highCount = stats?.by_severity.find(r => r.severity === 'HIGH')?.count ?? 0
   const uniqueIPs = new Set(attacks.map(a => a.src_ip)).size
-
-  const loginFailed  = stats?.by_event_type.find(r => r.event_type === 'login_failed')?.count ?? 0
+  const loginFailed = stats?.by_event_type.find(r => r.event_type === 'login_failed')?.count ?? 0
   const loginSuccess = stats?.by_event_type.find(r => r.event_type === 'login_success')?.count ?? 0
-  const successRate  = loginFailed + loginSuccess > 0
-    ? ((loginSuccess / (loginFailed + loginSuccess)) * 100).toFixed(1)
-    : '0.0'
-
-  // Top attack type
+  const successRate = loginFailed + loginSuccess > 0
+    ? ((loginSuccess / (loginFailed + loginSuccess)) * 100).toFixed(1) : '0.0'
   const topType = stats?.by_attack_type[0]?.attack_type ?? '—'
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card
-        label="Total Events"
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <TacCard
+        label="TOTAL EVENTS"
         value={totalEvents.toLocaleString()}
-        sub={`${stats?.by_event_type.length ?? 0} event types`}
-        accent="stone"
+        sub={`${stats?.by_event_type.length ?? 0} event types active`}
+        accent="var(--amber)"
+        index={0}
       />
-      <Card
-        label="Critical / High"
-        value={`${criticalCount.toLocaleString()} / ${highCount.toLocaleString()}`}
+      <TacCard
+        label="CRITICAL / HIGH"
+        value={`${criticalCount} / ${highCount}`}
         sub="severity distribution"
-        accent="red"
+        accent="var(--critical)"
+        index={1}
+        mono
       />
-      <Card
-        label="Unique Source IPs"
+      <TacCard
+        label="UNIQUE SOURCE IPs"
         value={uniqueIPs.toLocaleString()}
         sub={`${successRate}% login success rate`}
-        accent="amber"
+        accent="var(--high)"
+        index={2}
       />
-      <Card
-        label="Top Attack Type"
+      <TacCard
+        label="TOP ATTACK TYPE"
         value={topType.replace(/_/g, ' ')}
-        sub={`${stats?.by_attack_type[0]?.count ?? 0} events`}
-        accent="emerald"
+        sub={`${stats?.by_attack_type[0]?.count ?? 0} events captured`}
+        accent="var(--low)"
+        index={3}
+        mono={topType.length > 10}
       />
     </div>
   )

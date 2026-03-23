@@ -1,34 +1,57 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Header } from '../components/Header'
 import { scoreIP } from '../api/clients'
 import type { ScoreResult } from '../types'
 
 const SEV_COLOR: Record<string, string> = {
-  CRITICAL: 'text-red-600',
-  HIGH:     'text-orange-500',
-  MEDIUM:   'text-amber-500',
-  LOW:      'text-emerald-600',
-}
-const SEV_BG: Record<string, string> = {
-  CRITICAL: 'bg-red-50 border-red-200',
-  HIGH:     'bg-orange-50 border-orange-200',
-  MEDIUM:   'bg-amber-50 border-amber-200',
-  LOW:      'bg-emerald-50 border-emerald-200',
-}
-const SEV_BAR: Record<string, string> = {
-  CRITICAL: 'bg-red-500',
-  HIGH:     'bg-orange-400',
-  MEDIUM:   'bg-amber-400',
-  LOW:      'bg-emerald-400',
+  CRITICAL: '#FF3B3B',
+  HIGH: '#FF8800',
+  MEDIUM: '#FBC64C',
+  LOW: '#3DDB7A',
 }
 
-function ScoreBar({ value, color }: { value: number; color: string }) {
+const SEV_BG: Record<string, string> = {
+  CRITICAL: 'rgba(255,59,59,0.07)',
+  HIGH: 'rgba(255,136,0,0.07)',
+  MEDIUM: 'rgba(251,198,76,0.07)',
+  LOW: 'rgba(61,219,122,0.07)',
+}
+
+function ScoreBar({ value, color, height = 5 }: { value: number; color: string; height?: number }) {
   return (
-    <div className="w-full bg-stone-100 rounded-full h-2">
-      <div
-        className={`h-2 rounded-full transition-all duration-700 ${color}`}
-        style={{ width: `${(value * 100).toFixed(0)}%` }}
-      />
+    <div style={{ background: 'var(--void-4)', borderRadius: 1, height, overflow: 'hidden' }}>
+      <div style={{
+        width: `${Math.min(value * 100, 100).toFixed(1)}%`,
+        height, background: color,
+        boxShadow: `0 0 8px ${color}55`,
+        transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
+        position: 'relative',
+      }}>
+        <div style={{
+          position: 'absolute', right: 0, top: 0, bottom: 0,
+          width: 16,
+          background: `linear-gradient(90deg, transparent, ${color})`,
+          filter: 'blur(1px)',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+function FeatureRow({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '8px 0',
+      borderBottom: '1px solid rgba(30,24,16,0.7)',
+    }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)' }}>
+        {label.replace(/_/g, ' ')}
+      </span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--antiquity-2)', letterSpacing: '0.02em' }}>
+        {typeof value === 'number' ? value.toFixed(4) : value}
+      </span>
     </div>
   )
 }
@@ -36,172 +59,272 @@ function ScoreBar({ value, color }: { value: number; color: string }) {
 export function IPLookup() {
   const { ip: routeIP } = useParams<{ ip?: string }>()
   const navigate = useNavigate()
-
-  const [input, setInput]   = useState(routeIP ?? '')
+  const [input, setInput] = useState(routeIP ?? '')
   const [result, setResult] = useState<ScoreResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const lookup = async (ipToScore = input.trim()) => {
     if (!ipToScore) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
+    setLoading(true); setError(null); setResult(null)
     try {
       const r = await scoreIP(ipToScore)
       setResult(r)
       navigate(`/ip/${ipToScore}`, { replace: true })
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Scoring failed')
-    } finally {
-      setLoading(false)
-    }
+      setError(e?.response?.data?.detail ?? 'Scoring failed — check IP format')
+    } finally { setLoading(false) }
   }
 
-  // Auto-run if IP came from route
   useState(() => { if (routeIP) lookup(routeIP) })
 
+  const sColor = result ? SEV_COLOR[result.threat_level] : 'var(--amber)'
+  const sBg = result ? SEV_BG[result.threat_level] : 'transparent'
+
   return (
-    <div className="min-h-screen bg-stone-50 font-sans">
-      {/* Mini header */}
-      <header className="border-b border-stone-200 bg-white sticky top-0 z-50">
-        <div className="max-w-screen-2xl mx-auto px-6 h-14 flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-stone-400 hover:text-stone-700 transition-colors text-sm"
-          >
-            ← Dashboard
-          </button>
-          <span className="text-stone-200">|</span>
-          <div className="w-5 h-5 bg-red-600 rounded flex items-center justify-center">
-            <span className="text-white text-[10px] font-bold">HC</span>
+    <div style={{ minHeight: '100vh', background: 'var(--void)', fontFamily: 'var(--font-display)' }}>
+      <Header />
+
+      <main style={{ maxWidth: 960, margin: '0 auto', padding: '40px 28px 64px' }}>
+
+        {/* Page header */}
+        <div style={{ marginBottom: 32, animation: 'fade-in-up 0.4s ease both' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.2em', marginBottom: 12 }}>
+            ANALYST WORKSTATION / IP DOSSIER
           </div>
-          <span className="font-semibold text-stone-900 text-sm tracking-tight">IP Lookup</span>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontWeight: 800,
+            fontSize: 36, color: 'var(--antiquity)', margin: '0 0 8px', letterSpacing: '-0.02em',
+          }}>
+            Subject Dossier
+          </h1>
+          <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)', margin: 0 }}>
+            Isolation Forest · XGBoost+RF Ensemble · Bi-LSTM Sequence · MITRE ATT&CK
+          </p>
         </div>
-      </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-8">
-
-        {/* Search bar */}
-        <div>
-          <h1 className="text-2xl font-bold text-stone-900 mb-1">Threat Intelligence Lookup</h1>
-          <p className="text-sm text-stone-400 mb-6">Run the full ML pipeline on any IP — Isolation Forest · XGBoost+RF · Bi-LSTM</p>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && lookup()}
-              placeholder="e.g. 45.33.32.156"
-              className="flex-1 border border-stone-200 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:border-stone-400 bg-white"
-            />
+        {/* ── Search terminal ── */}
+        <div style={{
+          background: 'var(--void-2)',
+          border: '1px solid var(--void-4)',
+          borderRadius: 2,
+          padding: 20, marginBottom: 22,
+          animation: 'fade-in-up 0.4s ease 0.06s both',
+        }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 12 }}>
+            SUBJECT QUERY
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <span style={{
+                position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+                fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--amber)', opacity: 0.6,
+              }}>$</span>
+              <input
+                className="hc-input"
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && lookup()}
+                placeholder="score 45.33.32.156"
+                style={{ paddingLeft: 30 }}
+              />
+            </div>
             <button
+              className="btn-primary"
               onClick={() => lookup()}
               disabled={loading || !input.trim()}
-              className="px-6 py-2.5 bg-stone-900 text-white text-sm rounded-lg hover:bg-stone-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+              style={{ whiteSpace: 'nowrap', minWidth: 120 }}
             >
-              {loading ? 'Scoring...' : 'Score IP'}
+              {loading ? 'Scoring...' : 'Score IP →'}
             </button>
           </div>
           {error && (
-            <p className="mt-2 text-sm text-red-500 font-mono">{error}</p>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--critical)',
+              marginTop: 10, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>⚠</span>{error}
+            </div>
           )}
         </div>
 
-        {/* Loading state */}
+        {/* ── Loading state ── */}
         {loading && (
-          <div className="bg-white border border-stone-200 rounded-lg p-8 text-center space-y-3">
-            <div className="text-stone-400 text-sm font-mono space-y-1">
-              <div className="animate-pulse">Running Isolation Forest...</div>
-              <div className="animate-pulse" style={{ animationDelay: '0.3s' }}>XGBoost + Random Forest ensemble...</div>
-              <div className="animate-pulse" style={{ animationDelay: '0.6s' }}>Bi-LSTM sequence prediction...</div>
+          <div style={{
+            background: 'var(--void-2)', border: '1px solid var(--void-4)',
+            borderRadius: 2, padding: 32,
+          }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 20 }}>
+              ML PIPELINE RUNNING
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[
+                { label: 'LAYER 1', msg: 'Isolation Forest — anomaly detection...' },
+                { label: 'LAYER 2', msg: 'XGBoost + Random Forest ensemble...' },
+                { label: 'LAYER 3', msg: 'Bi-LSTM sequence prediction...' },
+              ].map((step, i) => (
+                <div key={step.msg} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 8,
+                    padding: '2px 7px',
+                    background: 'rgba(251,198,76,0.07)',
+                    border: '1px solid rgba(251,198,76,0.2)',
+                    color: 'var(--amber)',
+                    letterSpacing: '0.1em',
+                  }}>
+                    {step.label}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11,
+                    color: 'var(--bronze-3)',
+                    opacity: 0.4 + i * 0.25,
+                  }}>
+                    <span style={{ color: 'var(--amber)', marginRight: 6 }}>›</span>
+                    {step.msg}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Results */}
+        {/* ── Dossier results ── */}
         {result && !loading && (
-          <div className="space-y-5">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, animation: 'fade-in-up 0.4s ease both' }}>
 
-            {/* Hero card */}
-            <div className={`border rounded-lg p-6 ${SEV_BG[result.threat_level]}`}>
-              <div className="flex items-start justify-between mb-4">
+            {/* ── Hero card — Subject header ── */}
+            <div style={{
+              background: sBg,
+              border: `1px solid ${sColor}30`,
+              borderLeft: `3px solid ${sColor}`,
+              borderRadius: 2,
+              padding: '24px 28px',
+              boxShadow: `0 0 40px ${sColor}08`,
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {/* Bg glow */}
+              <div style={{
+                position: 'absolute', top: -40, right: -40,
+                width: 200, height: 200,
+                background: `radial-gradient(circle, ${sColor}12, transparent 65%)`,
+                pointerEvents: 'none',
+              }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
                 <div>
-                  <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold mb-1">IP Address</p>
-                  <p className="text-2xl font-bold text-stone-900 font-mono">{result.ip}</p>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 8 }}>
+                    SUBJECT · IP ADDRESS
+                  </div>
+                  <div style={{
+                    fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 32,
+                    color: 'var(--antiquity)', letterSpacing: '0.04em', lineHeight: 1,
+                  }}>
+                    {result.ip}
+                  </div>
                   {result.intel_match && (
-                    <p className="text-sm text-red-600 mt-1 font-mono">
-                      ⚠ {result.intel_match.note} [{result.intel_match.country}]
-                    </p>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      fontFamily: 'var(--font-mono)', fontSize: 11,
+                      color: 'var(--critical)', marginTop: 8,
+                    }}>
+                      <span>⚠</span>
+                      {result.intel_match.note} [{result.intel_match.country}]
+                    </div>
                   )}
                 </div>
-                <div className="text-right">
-                  <p className={`text-3xl font-bold ${SEV_COLOR[result.threat_level]}`}>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 8 }}>
+                    THREAT LEVEL
+                  </div>
+                  <div style={{
+                    fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 40,
+                    color: sColor, lineHeight: 1, letterSpacing: '-0.02em',
+                    textShadow: `0 0 30px ${sColor}44`,
+                  }}>
                     {result.threat_level}
-                  </p>
-                  <p className="text-sm text-stone-400 font-mono mt-1">
-                    {(result.anomaly_score * 100).toFixed(1)}% anomaly score
-                  </p>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)', marginTop: 5 }}>
+                    {(result.anomaly_score * 100).toFixed(2)}% anomaly
+                  </div>
                 </div>
               </div>
-              <ScoreBar value={result.anomaly_score} color={SEV_BAR[result.threat_level]} />
+
+              {/* Score meter */}
+              <ScoreBar value={result.anomaly_score} color={sColor} height={7} />
             </div>
 
-            {/* Two column */}
-            <div className="grid grid-cols-2 gap-5">
+            {/* ── Two columns — classification + forecast ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
               {/* Attack classification */}
-              <div className="bg-white border border-stone-200 rounded-lg p-5">
-                <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold mb-4">
-                  Attack Classification
-                </p>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-lg font-bold text-stone-900 font-mono">
+              <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, padding: 22 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 18 }}>
+                  ATTACK CLASSIFICATION
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 20, color: 'var(--antiquity)' }}>
                     {result.attack_type.replace(/_/g, ' ')}
                   </span>
-                  <span className="text-sm text-stone-400 font-mono">
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>
                     {(result.confidence * 100).toFixed(0)}% confidence
                   </span>
                 </div>
-                <ScoreBar value={result.confidence} color="bg-blue-400" />
-                <p className="text-xs text-stone-400 mt-4 mb-2 uppercase tracking-widest font-semibold">
-                  MITRE ATT&CK
-                </p>
-                <div className="space-y-2">
+                <ScoreBar value={result.confidence} color="#60a5fa" height={4} />
+
+                {/* MITRE */}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginTop: 20, marginBottom: 12 }}>
+                  MITRE ATT&CK MAPPING
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {result.mitre.map(m => (
-                    <div key={m.technique_id} className="flex items-start gap-2">
-                      <span className="text-[10px] font-mono bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded whitespace-nowrap">
-                        {m.technique_id}
+                    <div key={m.technique_id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span className="mitre-badge">{m.technique_id}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', lineHeight: 1.5 }}>
+                        {m.technique_name}
                       </span>
-                      <span className="text-xs text-stone-500">{m.technique_name}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Bi-LSTM forecast */}
-              <div className="bg-white border border-stone-200 rounded-lg p-5">
-                <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold mb-4">
-                  Bi-LSTM Next Move Forecast
-                </p>
+              <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, padding: 22 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 18 }}>
+                  BI-LSTM NEXT MOVE FORECAST
+                </div>
+
                 {result.next_moves.length === 0 ? (
-                  <p className="text-sm text-stone-300 font-mono">model unavailable</p>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
+                    model unavailable
+                  </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {result.next_moves.map((m, i) => (
                       <div key={m.attack_type}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-stone-400 font-mono">#{i + 1}</span>
-                            <span className="text-sm font-mono text-stone-800">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)' }}>#{i + 1}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--antiquity-2)' }}>
                               {m.attack_type.replace(/_/g, ' ')}
                             </span>
                           </div>
-                          <span className="text-xs text-stone-400 font-mono">
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze)' }}>
                             {(m.probability * 100).toFixed(1)}%
                           </span>
                         </div>
-                        <ScoreBar value={m.probability} color="bg-violet-500" />
+                        <div style={{ background: 'var(--void-4)', borderRadius: 1, height: 4, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${(m.probability * 100).toFixed(0)}%`,
+                            height: 4,
+                            background: 'linear-gradient(90deg, var(--bronze-3), var(--amber))',
+                            boxShadow: '0 0 6px rgba(251,198,76,0.3)',
+                            transition: 'width 0.7s ease',
+                          }} />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -209,21 +332,14 @@ export function IPLookup() {
               </div>
             </div>
 
-            {/* Flow features */}
-            <div className="bg-white border border-stone-200 rounded-lg p-5">
-              <p className="text-xs text-stone-400 uppercase tracking-widest font-semibold mb-4">
-                Flow Feature Breakdown
-              </p>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+            {/* ── Flow feature breakdown ── */}
+            <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, padding: 22 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.18em', marginBottom: 18 }}>
+                FLOW FEATURE BREAKDOWN — FORENSIC DATA
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 48px' }}>
                 {Object.entries(result.features).map(([key, val]) => (
-                  <div key={key} className="flex items-center justify-between py-1.5 border-b border-stone-50">
-                    <span className="text-xs text-stone-400 font-mono">
-                      {key.replace(/_/g, ' ')}
-                    </span>
-                    <span className="text-xs text-stone-700 font-mono tabular-nums">
-                      {typeof val === 'number' ? val.toFixed(3) : val}
-                    </span>
-                  </div>
+                  <FeatureRow key={key} label={key} value={val} />
                 ))}
               </div>
             </div>

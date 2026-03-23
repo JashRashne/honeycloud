@@ -9,10 +9,10 @@ function project(lng: number, lat: number): [number, number] {
 }
 
 const SEV_COLOR: Record<string, string> = {
-  CRITICAL: '#dc2626',
-  HIGH:     '#ea580c',
-  MEDIUM:   '#d97706',
-  LOW:      '#3b82f6',
+  CRITICAL: '#FF3B3B',
+  HIGH: '#FF8800',
+  MEDIUM: '#FBC64C',
+  LOW: '#3DDB7A',
 }
 
 function scoreToSev(score: number | null) {
@@ -23,7 +23,6 @@ function scoreToSev(score: number | null) {
   return 'LOW'
 }
 
-// Private IP placeholder — mid-Atlantic, clearly "not a real location"
 const PRIVATE_COORD: [number, number] = project(-30, 20)
 
 const LAND_PATHS = [
@@ -39,75 +38,55 @@ const LAND_PATHS = [
 ]
 
 interface GeoResult {
-  ip: string
-  lat: number | null
-  lon: number | null
-  country: string | null
-  countryCode: string | null
-  city: string | null
-  private: boolean
+  ip: string; lat: number | null; lon: number | null
+  country: string | null; countryCode: string | null
+  city: string | null; private: boolean
 }
 
 interface Dot {
-  x: number
-  y: number
-  ip: string
-  sev: string
-  count: number
-  country: string | null
-  city: string | null
-  isPrivate: boolean
+  x: number; y: number; ip: string; sev: string
+  count: number; country: string | null; city: string | null; isPrivate: boolean
 }
 
 export function AttackMap() {
-  const [dots, setDots]       = useState<Dot[]>([])
+  const [dots, setDots] = useState<Dot[]>([])
   const [tooltip, setTooltip] = useState<Dot | null>(null)
-  const [pulse, setPulse]     = useState(0)
+  const [pulse, setPulse] = useState(0)
 
   useEffect(() => {
     const load = async () => {
       try {
         const { top_ips } = await getTopIPs(20)
         if (top_ips.length === 0) return
-
         const ipList = top_ips.map((ip: TopIP) => ip.src_ip).join(',')
         const geoRes = await fetch(`/api/geoip?ips=${encodeURIComponent(ipList)}`)
         const geoData: { results: Record<string, GeoResult> } = await geoRes.json()
-
         const newDots: Dot[] = []
-        // Track private IP offset so multiple private IPs don't stack exactly
         let privateOffset = 0
-
         top_ips.forEach((ip: TopIP) => {
           const geo = geoData.results[ip.src_ip]
           if (!geo) return
-
           let x: number, y: number
-
           if (geo.private || !geo.lat || !geo.lon) {
-            // Plot private IPs at fixed mid-Atlantic position with slight spread
             x = PRIVATE_COORD[0] + (privateOffset % 3) * 12 - 12
             y = PRIVATE_COORD[1] + Math.floor(privateOffset / 3) * 12 - 6
             privateOffset++
           } else {
             const jitter = () => (Math.random() - 0.5) * 4
-            ;[x, y] = project(geo.lon + jitter(), geo.lat + jitter())
+              ;[x, y] = project(geo.lon + jitter(), geo.lat + jitter())
           }
-
           newDots.push({
-            x, y,
-            ip:        ip.src_ip,
-            sev:       scoreToSev(ip.max_anomaly_score),
-            count:     ip.total_events,
-            country:   geo.private ? 'Local Network' : geo.country,
-            city:      geo.private ? 'Private IP' : geo.city,
+            x, y, ip: ip.src_ip,
+            sev: scoreToSev(ip.max_anomaly_score),
+            count: ip.total_events,
+            country: geo.private ? 'Local Network' : geo.country,
+            city: geo.private ? 'Private IP' : geo.city,
             isPrivate: geo.private || !geo.lat,
           })
         })
         setDots(newDots)
       } catch { /* ignore */ }
     }
-
     load()
     const t = setInterval(load, 60_000)
     const p = setInterval(() => setPulse(n => n + 1), 2000)
@@ -115,78 +94,89 @@ export function AttackMap() {
   }, [])
 
   return (
-    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-stone-500 uppercase tracking-widest">
-          Attack Origins
-        </h2>
-        <span className="text-xs text-stone-400 font-mono">{dots.length} active sources</span>
+    <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{
+        padding: '12px 18px',
+        borderBottom: '1px solid var(--void-4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(251,198,76,0.02)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', letterSpacing: '0.18em' }}>
+          ATTACK ORIGIN MAP
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>
+          {dots.length} active sources
+        </span>
       </div>
 
-      <div className="relative bg-stone-50 p-2">
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxHeight: 340 }} className="block">
-          <rect width={W} height={H} fill="#f0f4f8" rx="4" />
+      <div style={{ position: 'relative', background: '#000' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxHeight: 340, display: 'block' }}>
+          {/* Background */}
+          <rect width={W} height={H} fill="#000" />
 
-          {LAND_PATHS.map((d, i) => (
-            <path key={i} d={d} fill="#dde3ea" stroke="#c8d0da" strokeWidth="0.5" />
-          ))}
-
+          {/* Grid lines — subtle bronze */}
           {[-60, -30, 0, 30, 60].map(lat => {
             const [, y] = project(0, lat)
-            return <line key={lat} x1={0} y1={y} x2={W} y2={y} stroke="#e2e8f0" strokeWidth="0.3" />
+            return <line key={lat} x1={0} y1={y} x2={W} y2={y} stroke="#1a1208" strokeWidth="0.5" />
           })}
           {[-120, -60, 0, 60, 120].map(lng => {
             const [x] = project(lng, 0)
-            return <line key={lng} x1={x} y1={0} x2={x} y2={H} stroke="#e2e8f0" strokeWidth="0.3" />
+            return <line key={lng} x1={x} y1={0} x2={x} y2={H} stroke="#1a1208" strokeWidth="0.5" />
           })}
 
-          {/* Private IP zone label */}
+          {/* Equator */}
+          <line x1={0} y1={H / 2} x2={W} y2={H / 2} stroke="#2d2010" strokeWidth="0.8" strokeDasharray="4 6" />
+
+          {/* Land masses */}
+          {LAND_PATHS.map((d, i) => (
+            <path key={i} d={d} fill="#16110a" stroke="#2a1e0f" strokeWidth="0.8" />
+          ))}
+
+          {/* Private zone indicator */}
           {dots.some(d => d.isPrivate) && (
             <>
               <rect
                 x={PRIVATE_COORD[0] - 30} y={PRIVATE_COORD[1] - 25}
-                width={80} height={60}
-                rx="4" fill="none"
-                stroke="#94a3b8" strokeWidth="0.8" strokeDasharray="4 3"
-                opacity={0.5}
+                width={80} height={60} rx="1"
+                fill="none" stroke="#3d2d14" strokeWidth="1"
+                strokeDasharray="4 3" opacity={0.5}
               />
-              <text
-                x={PRIVATE_COORD[0] + 10} y={PRIVATE_COORD[1] - 12}
-                textAnchor="middle"
-                fontSize="8" fill="#94a3b8"
-                fontFamily="monospace"
-              >
-                local
+              <text x={PRIVATE_COORD[0] + 10} y={PRIVATE_COORD[1] - 14}
+                textAnchor="middle" fontSize="7" fill="#4d3a1e" fontFamily="JetBrains Mono">
+                LOCAL
               </text>
             </>
           )}
 
-          {/* Dots */}
+          {/* Attack dots */}
           {dots.map((dot, i) => {
             const color = SEV_COLOR[dot.sev]
-            const r = Math.min(3 + Math.log10(dot.count + 1) * 3, 10)
+            const r = Math.min(3 + Math.log10(dot.count + 1) * 2.5, 9)
+            const isPulsing = pulse % 2 === i % 2
             return (
               <g key={dot.ip}
                 onMouseEnter={() => setTooltip(dot)}
                 onMouseLeave={() => setTooltip(null)}
                 style={{ cursor: 'pointer' }}
               >
-                {/* Pulse ring */}
-                <circle
-                  cx={dot.x} cy={dot.y}
-                  r={r + 4 + (pulse % 2 === i % 2 ? 4 : 0)}
-                  fill="none" stroke={color} strokeWidth="0.8"
-                  opacity={pulse % 2 === i % 2 ? 0.3 : 0.1}
-                  style={{ transition: 'r 1s ease, opacity 1s ease' }}
+                {/* Outer pulse */}
+                <circle cx={dot.x} cy={dot.y}
+                  r={r + 8 + (isPulsing ? 5 : 0)}
+                  fill="none" stroke={color} strokeWidth="0.5"
+                  opacity={isPulsing ? 0.18 : 0.05}
+                  style={{ transition: 'r 1.2s ease, opacity 1.2s ease' }}
                 />
-                {/* Private IPs get dashed border, public get solid */}
-                <circle
-                  cx={dot.x} cy={dot.y} r={r}
+                {/* Mid ring */}
+                <circle cx={dot.x} cy={dot.y} r={r + 3}
+                  fill="none" stroke={color} strokeWidth="0.5" opacity={0.15} />
+                {/* Core */}
+                <circle cx={dot.x} cy={dot.y} r={r}
                   fill={dot.isPrivate ? 'none' : color}
                   stroke={color}
-                  strokeWidth={dot.isPrivate ? '1.5' : '0'}
+                  strokeWidth={dot.isPrivate ? '1.2' : '0'}
                   strokeDasharray={dot.isPrivate ? '3 2' : 'none'}
-                  opacity={0.85}
+                  opacity={0.9}
+                  style={{ filter: `drop-shadow(0 0 5px ${color})` }}
                 />
                 {dot.isPrivate && (
                   <circle cx={dot.x} cy={dot.y} r={r * 0.4} fill={color} opacity={0.6} />
@@ -198,38 +188,57 @@ export function AttackMap() {
 
         {/* Tooltip */}
         {tooltip && (
-          <div
-            className="absolute z-10 bg-white border border-stone-200 rounded-lg shadow-sm p-2.5 text-xs font-mono pointer-events-none"
-            style={{ top: 8, right: 8, minWidth: 160 }}
-          >
-            <div className="font-semibold text-stone-800 mb-1">{tooltip.ip}</div>
+          <div style={{
+            position: 'absolute', top: 10, right: 10,
+            background: 'var(--void-2)',
+            border: '1px solid var(--void-4)',
+            borderRadius: 2,
+            padding: '10px 14px',
+            minWidth: 148,
+            pointerEvents: 'none',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.6)',
+          }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--antiquity)', fontWeight: 600, marginBottom: 5 }}>
+              {tooltip.ip}
+            </div>
             {tooltip.city && (
-              <div className="text-stone-500 mb-0.5">{tooltip.city}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>{tooltip.city}</div>
             )}
             {tooltip.country && (
-              <div className="text-stone-500 mb-0.5">{tooltip.country}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', marginBottom: 5 }}>{tooltip.country}</div>
             )}
-            <div className="text-stone-400">{tooltip.count} events</div>
-            <div className="font-semibold mt-1" style={{ color: SEV_COLOR[tooltip.sev] }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', marginBottom: 4 }}>
+              {tooltip.count.toLocaleString()} events
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600,
+              color: SEV_COLOR[tooltip.sev],
+            }}>
               {tooltip.sev}
             </div>
-            {tooltip.isPrivate && (
-              <div className="text-stone-300 text-[10px] mt-1">shown at placeholder position</div>
-            )}
           </div>
         )}
 
         {/* Legend */}
-        <div className="flex items-center gap-3 px-2 pb-1 pt-1 flex-wrap">
+        <div style={{
+          display: 'flex', gap: 14, padding: '6px 12px',
+          background: 'rgba(0,0,0,0.4)',
+          flexWrap: 'wrap', alignItems: 'center',
+        }}>
           {Object.entries(SEV_COLOR).map(([sev, color]) => (
-            <div key={sev} className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-              <span className="text-[10px] text-stone-400 font-mono">{sev}</span>
+            <div key={sev} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: color,
+                boxShadow: `0 0 5px ${color}`,
+                display: 'inline-block',
+              }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.1em' }}>{sev}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1 ml-2 pl-2 border-l border-stone-200">
-            <span className="w-2 h-2 rounded-full border border-dashed border-stone-400" />
-            <span className="text-[10px] text-stone-400 font-mono">local/private</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 8, paddingLeft: 8, borderLeft: '1px solid var(--void-4)' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', border: '1px dashed var(--bronze-3)', display: 'inline-block' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)' }}>local/private</span>
           </div>
         </div>
       </div>

@@ -26,54 +26,59 @@ export function HourlyTimeline({ stats }: Props) {
   const max = Math.max(...filled.map(d => d.count), 1)
 
   return (
-    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-stone-500 uppercase tracking-widest">
-          Hourly Activity (24h)
-        </h2>
-        <span className="text-xs text-stone-400 font-mono">
-          peak {max.toLocaleString()} events/hr
+    <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{
+        padding: '12px 18px',
+        borderBottom: '1px solid var(--void-4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(251,198,76,0.02)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', letterSpacing: '0.18em' }}>
+          HOURLY ACTIVITY — 24H
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>
+          peak {max.toLocaleString()} / hr
         </span>
       </div>
 
-      <div className="p-4" style={{ height: 260 }}>
+      <div style={{ padding: '16px 18px', height: 240 }}>
         {raw.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-stone-300 text-xs font-mono">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
             no data yet
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={filled} barSize={18} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-              <CartesianGrid vertical={false} stroke="#f5f5f4" />
+            <BarChart data={filled} barSize={16} margin={{ top: 4, right: 4, bottom: 0, left: -22 }}>
+              <CartesianGrid vertical={false} stroke="rgba(45,32,16,0.6)" />
               <XAxis
                 dataKey="hour"
-                tick={{ fontSize: 10, fontFamily: 'monospace', fill: '#a8a29e' }}
-                tickLine={false}
-                axisLine={false}
-                interval={3}
+                tick={{ fontSize: 8, fontFamily: 'JetBrains Mono', fill: '#4d3a1e' }}
+                tickLine={false} axisLine={false} interval={3}
               />
               <YAxis
-                tick={{ fontSize: 10, fontFamily: 'monospace', fill: '#a8a29e' }}
-                tickLine={false}
-                axisLine={false}
-                allowDecimals={false}
+                tick={{ fontSize: 8, fontFamily: 'JetBrains Mono', fill: '#4d3a1e' }}
+                tickLine={false} axisLine={false} allowDecimals={false}
               />
               <Tooltip
-                cursor={{ fill: '#f5f5f4' }}
+                cursor={{ fill: 'rgba(251,198,76,0.04)' }}
                 contentStyle={{
-                  fontSize: 11, fontFamily: 'monospace',
-                  border: '1px solid #e7e5e4', borderRadius: 6,
+                  background: 'var(--void-2)',
+                  border: '1px solid var(--void-4)',
+                  borderRadius: 2, fontSize: 11,
+                  fontFamily: 'JetBrains Mono',
+                  color: 'var(--antiquity-2)',
                 }}
                 formatter={(value) => [`${Number(value)} events`, 'count']}
               />
-              <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+              <Bar dataKey="count" radius={[2, 2, 0, 0]}>
                 {filled.map((d, i) => (
                   <Cell
                     key={i}
                     fill={
-                      d.count === 0        ? '#e7e5e4' :
-                      d.count >= max * 0.8 ? '#dc2626' :
-                      d.count >= max * 0.5 ? '#ea580c' : '#3b82f6'
+                      d.count === 0 ? '#1a1208' :
+                        d.count >= max * 0.8 ? '#FF3B3B' :
+                          d.count >= max * 0.5 ? '#FF8800' :
+                            '#FBC64C'
                     }
                   />
                 ))}

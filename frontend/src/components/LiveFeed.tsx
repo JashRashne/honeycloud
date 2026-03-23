@@ -2,115 +2,173 @@ import { useEffect, useRef } from 'react'
 import type { Attack, Severity } from '../types'
 import { useNavigate } from 'react-router-dom'
 
-const SEVERITY_COLOR: Record<Severity, string> = {
-  CRITICAL: 'bg-red-100 text-red-700 border-red-200',
-  HIGH:     'bg-orange-100 text-orange-700 border-orange-200',
-  MEDIUM:   'bg-amber-100 text-amber-700 border-amber-200',
-  LOW:      'bg-stone-100 text-stone-500 border-stone-200',
+const SEV_COLOR: Record<Severity, string> = {
+  CRITICAL: 'var(--critical)',
+  HIGH: 'var(--high)',
+  MEDIUM: 'var(--amber)',
+  LOW: 'var(--low)',
 }
 
-const SEVERITY_DOT: Record<Severity, string> = {
-  CRITICAL: 'bg-red-500',
-  HIGH:     'bg-orange-400',
-  MEDIUM:   'bg-amber-400',
-  LOW:      'bg-stone-300',
-}
-
-const EVENT_ICON: Record<string, string> = {
-  connect:       '⟶',
-  login_failed:  '✕',
+const EVENT_GLYPH: Record<string, string> = {
+  connect: '→',
+  login_failed: '✕',
   login_success: '✓',
-  command:       '$',
-  disconnect:    '⟵',
+  command: '$',
+  disconnect: '←',
 }
 
 function timeAgo(ts: string) {
   const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000)
-  if (diff < 60)  return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  return `${Math.floor(diff / 3600)}h ago`
+  if (diff < 60) return `${diff}s`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  return `${Math.floor(diff / 3600)}h`
 }
 
-interface Props {
-  attacks: Attack[]
-}
+interface Props { attacks: Attack[] }
 
 export function LiveFeed({ attacks }: Props) {
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
-  const prevLen  = useRef(0)
+  const prevLen = useRef(0)
+  const topRowRef = useRef<HTMLDivElement>(null)
 
-  // Flash newest row on update
   useEffect(() => {
-    if (attacks.length > prevLen.current && listRef.current) {
-      const first = listRef.current.firstElementChild as HTMLElement | null
+    if (attacks.length > prevLen.current) {
+      // Flash the top new row
+      const first = listRef.current?.firstElementChild as HTMLElement | null
       if (first) {
-        first.style.transition = 'none'
-        first.style.background = '#fef9c3'
-        requestAnimationFrame(() => {
-          first.style.transition = 'background 1.2s ease'
-          first.style.background = ''
-        })
+        first.style.background = 'rgba(251,198,76,0.07)'
+        first.style.borderLeft = '2px solid var(--amber)'
+        setTimeout(() => {
+          if (first) {
+            first.style.background = ''
+            first.style.borderLeft = ''
+          }
+        }, 800)
       }
     }
     prevLen.current = attacks.length
   }, [attacks])
 
   return (
-    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between">
-        <h2 className="text-xs font-semibold text-stone-500 uppercase tracking-widest">Live Feed</h2>
-        <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-          streaming
+    <div style={{
+      background: 'var(--void-2)',
+      border: '1px solid var(--void-4)',
+      borderRadius: 2,
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '12px 18px',
+        borderBottom: '1px solid var(--void-4)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(251,198,76,0.02)',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', letterSpacing: '0.18em' }}>
+          FORENSIC LEDGER
         </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div className="pulse-dot" style={{ width: 5, height: 5 }} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--amber)', letterSpacing: '0.1em' }}>
+            STREAMING
+          </span>
+        </div>
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2 border-b border-stone-50 text-[10px] font-semibold text-stone-400 uppercase tracking-widest">
-        <span>Source IP</span>
-        <span>Event</span>
-        <span>Type</span>
-        <span>Time</span>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '22px 1fr 60px 70px 32px',
+        gap: 8,
+        padding: '5px 18px',
+        borderBottom: '1px solid rgba(30,24,16,0.9)',
+        background: 'rgba(0,0,0,0.2)',
+        flexShrink: 0,
+      }}>
+        {['', 'SOURCE IP', 'EVENT', 'TYPE', 'AGO'].map((h, i) => (
+          <span key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.14em' }}>{h}</span>
+        ))}
       </div>
 
       {/* Rows */}
-      <div ref={listRef} className="overflow-y-auto flex-1 divide-y divide-stone-50" style={{ maxHeight: 420 }}>
+      <div ref={listRef} style={{ overflowY: 'auto', flex: 1, maxHeight: 420 }}>
         {attacks.length === 0 && (
-          <div className="flex items-center justify-center h-24 text-stone-300 text-xs font-mono">
-            waiting for events...
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: 80, gap: 8,
+          }}>
+            <div className="pulse-dot" style={{ width: 4, height: 4, background: 'var(--bronze-3)', animationName: 'none', opacity: 0.4 }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)' }}>
+              awaiting events...
+            </span>
           </div>
         )}
         {attacks.map((a) => {
           const sev = (a.severity ?? 'LOW') as Severity
+          const color = SEV_COLOR[sev]
           return (
             <div
               key={a.id}
-              className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2.5 items-center hover:bg-stone-50 transition-colors"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '22px 1fr 60px 70px 32px',
+                gap: 8,
+                padding: '7px 18px',
+                alignItems: 'center',
+                borderBottom: '1px solid rgba(20,16,10,0.7)',
+                transition: 'background 0.3s, border-left 0.3s',
+                borderLeft: '2px solid transparent',
+              }}
+              className="row-hover"
             >
-              {/* IP + dot */}
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${SEVERITY_DOT[sev]}`} />
-                <span className="font-mono text-xs text-stone-700 truncate cursor-pointer hover:text-blue-600 hover:underline" onClick={() => navigate(`/ip/${a.src_ip}`)}>{a.src_ip}</span>
+              {/* Severity dot */}
+              <div style={{
+                width: 4, height: 4, borderRadius: '50%',
+                background: color,
+                boxShadow: `0 0 5px ${color}`,
+              }} />
+
+              {/* IP */}
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                  color: 'var(--antiquity-2)',
+                  cursor: 'pointer', overflow: 'hidden',
+                  textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  transition: 'color 0.15s',
+                }}
+                onClick={() => navigate(`/ip/${a.src_ip}`)}
+                onMouseEnter={e => (e.target as HTMLElement).style.color = 'var(--amber)'}
+                onMouseLeave={e => (e.target as HTMLElement).style.color = 'var(--antiquity-2)'}
+              >
+                {a.src_ip}
               </div>
 
               {/* Event type */}
-              <div className="flex items-center gap-1">
-                <span className="text-stone-400 font-mono text-xs w-4 text-center">
-                  {EVENT_ICON[a.event_type] ?? '·'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)', width: 10, textAlign: 'center' }}>
+                  {EVENT_GLYPH[a.event_type] ?? '·'}
                 </span>
-                <span className="text-xs text-stone-500 font-mono whitespace-nowrap">
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {a.event_type.replace(/_/g, ' ')}
                 </span>
               </div>
 
               {/* Attack type badge */}
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border whitespace-nowrap ${SEVERITY_COLOR[sev]}`}>
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 8,
+                padding: '2px 5px', borderRadius: 1,
+                background: `${color}10`, color, border: `1px solid ${color}30`,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
                 {a.attack_type?.replace(/_/g, ' ') ?? '—'}
               </span>
 
-              {/* Time */}
-              <span className="text-[10px] text-stone-400 font-mono whitespace-nowrap">
+              {/* Time ago */}
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', whiteSpace: 'nowrap', textAlign: 'right' }}>
                 {timeAgo(a.timestamp)}
               </span>
             </div>
