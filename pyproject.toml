@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "honeycloud"
 version = "0.1.8"
 description = "Adaptive cloud honeypot platform — deploy decoys, monitor attacks, score threats with ML"
-readme = "README.md"
+readme = "readme.md"
 license = { text = "MIT" }
 authors = [{ name = "HoneyCloud Team" }]
 keywords = ["honeypot", "cybersecurity", "threat-intelligence", "anomaly-detection", "deception"]

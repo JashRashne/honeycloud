@@ -10,18 +10,20 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python deps first (layer cache)
 COPY pyproject.toml .
-COPY README.md .
+COPY readme.md .
+
+# Copy source
+COPY honeycloud/ ./honeycloud/
+COPY api/ ./api/
+
 RUN pip install --no-cache-dir -e ".[server]" || pip install --no-cache-dir -e .
 
 # Install server-specific deps not in pyproject.toml
 RUN pip install --no-cache-dir \
     fastapi \
     "uvicorn[standard]" \
-    psycopg2-binary
+    psycopg2-binary 
 
-# Copy source
-COPY honeycloud/ ./honeycloud/
-COPY api/ ./api/
 
 # Default command — overridden per service in docker-compose
 CMD ["honeycloud", "serve", "--host", "0.0.0.0", "--port", "8000"]

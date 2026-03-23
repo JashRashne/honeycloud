@@ -1,5 +1,18 @@
 services:
 
+  # ── Init cowrie logs volume permissions ─────────────────────
+  cowrie-init:
+    image: busybox:1.36
+    container_name: honeycloud-cowrie-init
+    restart: "no"
+    volumes:
+      - cowrie-logs:/logs
+    command: >
+      sh -c "mkdir -p /logs &&
+             touch /logs/cowrie.json &&
+             chmod 777 /logs &&
+             chmod 666 /logs/cowrie.json"
+
   # ── PostgreSQL ──────────────────────────────────────────────
   postgres:
     image: postgres:15
@@ -24,10 +37,14 @@ services:
     image: cowrie/cowrie:latest
     container_name: honeycloud-cowrie
     restart: unless-stopped
+    depends_on:
+      cowrie-init:
+        condition: service_completed_successfully
     ports:
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
 
@@ -48,7 +65,6 @@ services:
       - ./honeycloud:/app/honeycloud
     command: >
       honeycloud collect
-      --log-path /app/data/cowrie-logs/cowrie.json
       --db-url postgresql://honeycloud:honeycloud@postgres:5432/honeycloud
 
   # ── FastAPI ─────────────────────────────────────────────────
@@ -74,5 +90,6 @@ services:
 volumes:
   honeycloud-pgdata:
     name: honeycloud-pgdata
+
   cowrie-logs:
     name: honeycloud-cowrie-logs

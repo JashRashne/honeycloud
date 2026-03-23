@@ -494,6 +494,48 @@ def tail_and_collect(log_path: str, conn, dry_run: bool = False,
 
 
 # ─────────────────────────────────────────────
+#  Wait for log file
+# ─────────────────────────────────────────────
+def _wait_for_log_file(candidates: list, explicit_path: str = None, 
+                       timeout: int = 60) -> str | None:
+    """
+    Wait for log file to appear, with retries.
+    
+    Args:
+        candidates: list of paths to check
+        explicit_path: if provided, only wait for this path
+        timeout: max seconds to wait (default 60)
+    
+    Returns:
+        path to log file if found, None if timeout
+    """
+    if explicit_path:
+        paths_to_check = [explicit_path]
+    else:
+        paths_to_check = candidates
+    
+    start = time.time()
+    attempt = 0
+    
+    while time.time() - start < timeout:
+        attempt += 1
+        
+        # Check each candidate
+        for candidate in paths_to_check:
+            if os.path.exists(candidate):
+                log.info(f"✅ Found log file: {candidate}")
+                return candidate
+        
+        elapsed = int(time.time() - start)
+        if attempt % 10 == 1:  # Log every ~10 seconds
+            log.info(f"⏳ Waiting for cowrie.json... ({elapsed}s elapsed, {timeout - elapsed}s remaining)")
+        
+        time.sleep(1)
+    
+    return None
+
+
+# ─────────────────────────────────────────────
 #  Entry point
 # ─────────────────────────────────────────────
 def main():
@@ -507,18 +549,18 @@ def main():
                         help="Reprocess the entire existing log file on startup")
     args = parser.parse_args()
 
-    # find log file
+    # find log file (with wait for it to be created)
     log_path = args.log_path
     if not log_path:
-        for candidate in DEFAULT_LOG_CANDIDATES:
-            if os.path.exists(candidate):
-                log_path = candidate
-                break
-
-    if not log_path or not os.path.exists(log_path):
+        log_path = _wait_for_log_file(DEFAULT_LOG_CANDIDATES, explicit_path=None, timeout=60)
+    else:
+        # Even if explicit path is given, wait for it to exist
+        log_path = _wait_for_log_file(DEFAULT_LOG_CANDIDATES, explicit_path=log_path, timeout=60)
+    
+    if not log_path:
         log.error(
-            "cowrie.json not found. Run 'honeycloud deploy' first "
-            "or pass --log-path"
+            "cowrie.json not found after waiting 60 seconds. Check that Cowrie is running "
+            "and writing to the log file."
         )
         return
 
