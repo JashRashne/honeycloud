@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for psycopg2 and XGBoost
+# System deps for XGBoost
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
@@ -22,8 +22,7 @@ RUN pip install --no-cache-dir -e ".[server]" || pip install --no-cache-dir -e .
 RUN pip install --no-cache-dir \
     fastapi \
     "uvicorn[standard]" \
-    psycopg2-binary 
+    asyncpg \
+    psycopg2-binary
 
-
-# Default command — overridden per service in docker-compose
 CMD ["honeycloud", "serve", "--host", "0.0.0.0", "--port", "8000"]

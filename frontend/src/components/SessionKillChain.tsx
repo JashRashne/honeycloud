@@ -26,6 +26,19 @@ function duration(sec: number | null) {
   return `${(sec / 60).toFixed(1)}m`
 }
 
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed as T[]
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -52,9 +65,14 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
       .then(setDetail)
       .catch(() => { })
       .finally(() => setDetailLoading(false))
-  }, [selected, refreshTrigger])
+  }, [selected])
 
-  const stagesHit = new Set(detail?.events.map(e => e.event_type) ?? [])
+  const events = asArray<SessionDetail['events'][number]>(detail?.events)
+  const credentials = asArray<{ username: string; password: string }>(detail?.session?.credentials)
+  const commands = asArray<string>(detail?.session?.commands).filter((cmd): cmd is string => typeof cmd === 'string')
+
+  // Which stages appeared in this session
+  const stagesHit = new Set(events.map(e => e.event_type))
 
   return (
     <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, overflow: 'hidden' }}>
@@ -222,49 +240,34 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
                   ))}
                 </div>
 
-                {/* Credentials */}
-                {detail.session.credentials.length > 0 && (
+                {/* Credentials captured */}
+                {credentials.length > 0 && (
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.14em', marginBottom: 8 }}>
-                      CREDENTIALS ATTEMPTED
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 100, overflowY: 'auto' }}>
-                      {detail.session.credentials.slice(0, 8).map((c, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 10,
-                            background: 'var(--void-4)', color: 'var(--antiquity-3)',
-                            padding: '2px 6px', borderRadius: 1,
-                          }}>{c.username}</span>
-                          <span style={{ color: 'var(--void-4)', fontFamily: 'var(--font-mono)' }}>/</span>
-                          <span style={{
-                            fontFamily: 'var(--font-mono)', fontSize: 10,
-                            background: 'rgba(255,59,59,0.07)',
-                            color: 'var(--critical)',
-                            border: '1px solid rgba(255,59,59,0.18)',
-                            padding: '2px 6px', borderRadius: 1,
-                          }}>{c.password}</span>
+                    <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
+                      Credentials Attempted
+                    </p>
+                    <div className="space-y-1 max-h-28 overflow-y-auto">
+                      {credentials.slice(0, 8).map((c, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
+                          <span className="text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{c.username}</span>
+                          <span className="text-stone-300">/</span>
+                          <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{c.password}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Commands */}
-                {detail.session.commands.length > 0 && (
+                {/* Commands run */}
+                {commands.length > 0 && (
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.14em', marginBottom: 8 }}>
-                      COMMANDS EXECUTED
-                    </div>
-                    <div style={{
-                      background: 'var(--void)',
-                      border: '1px solid var(--void-4)',
-                      borderRadius: 2, padding: '10px 14px',
-                      maxHeight: 120, overflowY: 'auto',
-                    }}>
-                      {detail.session.commands.map((cmd, i) => (
-                        <div key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--low)', lineHeight: 1.9 }}>
-                          <span style={{ color: 'var(--bronze-3)', marginRight: 8 }}>$</span>{cmd}
+                    <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
+                      Commands Executed
+                    </p>
+                    <div className="bg-stone-900 rounded-lg p-3 max-h-32 overflow-y-auto">
+                      {commands.map((cmd, i) => (
+                        <div key={i} className="text-[11px] font-mono text-emerald-400 leading-5">
+                          <span className="text-stone-500 mr-2">$</span>{cmd}
                         </div>
                       ))}
                     </div>
@@ -273,57 +276,26 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
 
                 {/* Event timeline — vertical */}
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.14em', marginBottom: 10 }}>
-                    EVENT TIMELINE
-                  </div>
-                  <div style={{ position: 'relative', paddingLeft: 30 }}>
-                    {/* Vertical bronze line */}
-                    <div style={{
-                      position: 'absolute', left: 9, top: 6, bottom: 6,
-                      width: 1,
-                      background: 'linear-gradient(to bottom, var(--amber), var(--bronze-3), transparent)',
-                    }} />
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 200, overflowY: 'auto' }}>
-                      {detail.events.map((e, idx) => {
-                        const badge = STAGE_BADGE[e.event_type]
-                        const kcItem = KILL_CHAIN.find(k => k.stage === e.event_type)
-                        return (
-                          <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
-                            {/* Node on line */}
-                            <div style={{
-                              position: 'absolute', left: -25,
-                              width: 8, height: 8, borderRadius: '50%',
-                              background: kcItem?.color ?? 'var(--bronze-3)',
-                              border: '1px solid var(--void-2)',
-                              boxShadow: kcItem ? `0 0 6px ${kcItem.color}55` : 'none',
-                              flexShrink: 0,
-                            }} />
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', minWidth: 52, flexShrink: 0 }}>
-                              {fmt(e.timestamp)}
-                            </span>
-                            <span style={{
-                              fontFamily: 'var(--font-mono)', fontSize: 9,
-                              padding: '2px 6px', borderRadius: 1,
-                              background: badge?.bg ?? 'var(--void-4)',
-                              color: badge?.color ?? 'var(--bronze-3)',
-                              border: `1px solid ${badge?.border ?? 'var(--void-4)'}`,
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {e.event_type.replace(/_/g, ' ')}
-                            </span>
-                            {e.command && (
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {e.command}
-                              </span>
-                            )}
-                            {e.username && !e.command && (
-                              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>{e.username}</span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
+                  <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
+                    Event Timeline
+                  </p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {events.map(e => (
+                      <div key={e.id} className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono text-stone-300 w-16 flex-shrink-0">
+                          {fmt(e.timestamp)}
+                        </span>
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${STAGE_COLOR[e.event_type] ?? 'bg-stone-100 text-stone-500 border-stone-200'}`}>
+                          {e.event_type.replace(/_/g, ' ')}
+                        </span>
+                        {e.command && (
+                          <span className="text-[10px] font-mono text-stone-500 truncate">{e.command}</span>
+                        )}
+                        {e.username && !e.command && (
+                          <span className="text-[10px] font-mono text-stone-400">{e.username}</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

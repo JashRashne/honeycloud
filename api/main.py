@@ -6,19 +6,29 @@ api/main.py
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 from datetime import datetime, timezone
 from typing import Any
 
+import asyncpg
 import httpx
-import psycopg2
-import psycopg2.extras
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+
+DB_URL = os.environ.get(
+    "HONEYCLOUD_DB_URL",
+    "postgresql://honeycloud:honeycloud@localhost:5432/honeycloud",
+)
 
 app = FastAPI(
     title="HoneyCloud API",
@@ -33,14 +43,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_URL = os.environ.get(
-    "HONEYCLOUD_DB_URL",
-    "postgresql://honeycloud:honeycloud@localhost:5432/honeycloud",
-)
+
+# ═══════════════════════════════════════════════════════════════
+#  DB pool — created once, reused across all requests
+# ═══════════════════════════════════════════════════════════════
+
+async def _create_pool() -> asyncpg.Pool:
+    # asyncpg needs postgresql:// not postgresql+psycopg2://
+    dsn = DB_URL.replace("postgresql+psycopg2://", "postgresql://")
+    return await asyncpg.create_pool(
+        dsn=dsn,
+        min_size=1,
+        max_size=5,
+        max_inactive_connection_lifetime=240,  # keepalive — NeonDB suspends at 5min
+        command_timeout=10,
+    )
 
 
-def _get_conn():
-    return psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+@app.on_event("startup")
+async def startup():
+    app.state.pool = await _create_pool()
+    # Pre-warm: one query so first real request is instant
+    async with app.state.pool.acquire() as conn:
+        await conn.fetchval("SELECT 1")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await app.state.pool.close()
+
+
+def _pool() -> asyncpg.Pool:
+    return app.state.pool
 
 
 # ── WebSocket hub ─────────────────────────────────────────────
@@ -53,7 +87,8 @@ class _Hub:
         self._clients.append(ws)
 
     def disconnect(self, ws: WebSocket):
-        self._clients.remove(ws)
+        if ws in self._clients:
+            self._clients.remove(ws)
 
     async def broadcast(self, data: dict):
         dead = []
@@ -79,8 +114,8 @@ def _score_ip(ip: str) -> dict:
     if ip in _score_cache:
         return _score_cache[ip]
 
-    import numpy as np
     import warnings
+    import numpy as np
     warnings.filterwarnings("ignore")
 
     from honeycloud.score import (
@@ -93,13 +128,13 @@ def _score_ip(ip: str) -> dict:
     X = _features_to_array(features)
 
     raw_score = _CACHE["iso"].decision_function(X)[0]
-    anomaly_score = float(__import__("numpy").clip(0.5 - raw_score, 0.0, 1.0))
+    anomaly_score = float(np.clip(0.5 - raw_score, 0.0, 1.0))
 
-    xgb_probs  = _CACHE["xgb"].predict_proba(X)[0]
-    rf_probs   = _CACHE["rf"].predict_proba(X)[0]
-    ensemble   = (xgb_probs + rf_probs) / 2
-    pred_idx   = int(__import__("numpy").argmax(ensemble))
-    confidence = float(ensemble[pred_idx])
+    xgb_probs   = _CACHE["xgb"].predict_proba(X)[0]
+    rf_probs    = _CACHE["rf"].predict_proba(X)[0]
+    ensemble    = (xgb_probs + rf_probs) / 2
+    pred_idx    = int(np.argmax(ensemble))
+    confidence  = float(ensemble[pred_idx])
     attack_type = _CACHE["le"].inverse_transform([pred_idx])[0]
 
     next_moves: list[dict] = []
@@ -107,16 +142,16 @@ def _score_ip(ip: str) -> dict:
         try:
             SEQ_LEN   = 5
             feat_cols = _CACHE["feature_cols"]
-            single    = __import__("numpy").array(
-                [features.get(c, 0.0) for c in feat_cols], dtype=__import__("numpy").float32
+            single    = np.array(
+                [features.get(c, 0.0) for c in feat_cols], dtype=np.float32
             )
             X_seq = _CACHE["lstm_scaler"].transform(
-                __import__("numpy").tile(single, (SEQ_LEN, 1))
-            ).reshape(1, SEQ_LEN, len(feat_cols)).astype(__import__("numpy").float32)
+                np.tile(single, (SEQ_LEN, 1))
+            ).reshape(1, SEQ_LEN, len(feat_cols)).astype(np.float32)
             sess     = _CACHE["lstm"]
             inp_name = sess.get_inputs()[0].name
             probs    = sess.run(None, {inp_name: X_seq})[0][0]
-            top2_idx = __import__("numpy").argsort(probs)[::-1][:2]
+            top2_idx = np.argsort(probs)[::-1][:2]
             classes  = _CACHE["lstm_le"].classes_
             next_moves = [
                 {"attack_type": classes[i], "probability": float(probs[i])}
@@ -188,7 +223,6 @@ def _is_private(ip: str) -> bool:
 
 
 async def _fetch_geoip(ip: str) -> dict:
-    """Fetch from ip-api.com with in-memory cache."""
     if ip in _geoip_cache:
         return _geoip_cache[ip]
 
@@ -228,26 +262,39 @@ async def _fetch_geoip(ip: str) -> dict:
             "isp": None, "org": None}
 
 
+# ── asyncpg returns Record objects — convert to plain dicts ───
+def _rec(row: Any) -> dict:
+    if row is None:
+        return {}
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, datetime):
+            d[k] = v.isoformat()
+    return d
+
+
+def _recs(rows: list) -> list[dict]:
+    return [_rec(r) for r in rows]
+
+
 # ═══════════════════════════════════════════════════════════════
 #  ROUTES
 # ═══════════════════════════════════════════════════════════════
 
 @app.get("/api/health")
-def health():
-    db_ok = False
+async def health():
+    db_ok    = False
     db_error = None
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-        cur.execute("SELECT 1")
-        conn.close()
+        async with _pool().acquire() as conn:
+            await conn.fetchval("SELECT 1")
         db_ok = True
     except Exception as e:
         db_error = str(e)
 
     try:
         from honeycloud.score import _load_models, _CACHE
-        models_ok = _load_models()
+        models_ok   = _load_models()
         model_error = _CACHE.get("error")
     except Exception as e:
         models_ok   = False
@@ -262,120 +309,98 @@ def health():
 
 
 @app.get("/api/attacks/live")
-def attacks_live(limit: int = Query(50, ge=1, le=500)):
+async def attacks_live(limit: int = Query(50, ge=1, le=500)):
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-        cur.execute("""
-            SELECT id, src_ip, event_type, username, password,
-                   command, timestamp, session_id,
-                   anomaly_score, severity, attack_type
-            FROM   attacks
-            ORDER  BY timestamp DESC
-            LIMIT  %s
-        """, (limit,))
-        rows = cur.fetchall()
-        conn.close()
-        return {"count": len(rows), "attacks": [dict(r) for r in rows]}
+        async with _pool().acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, src_ip, event_type, username, password,
+                       command, timestamp, session_id,
+                       anomaly_score, severity, attack_type
+                FROM   attacks
+                ORDER  BY timestamp DESC
+                LIMIT  $1
+            """, limit)
+        return {"count": len(rows), "attacks": _recs(rows)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/attacks/stats")
-def attacks_stats():
+async def attacks_stats():
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-
-        cur.execute("""
-            SELECT event_type, COUNT(*) AS count
-            FROM   attacks
-            GROUP  BY event_type
-            ORDER  BY count DESC
-        """)
-        by_event = [dict(r) for r in cur.fetchall()]
-
-        cur.execute("""
-            SELECT attack_type, COUNT(*) AS count
-            FROM   attacks
-            WHERE  attack_type IS NOT NULL
-            GROUP  BY attack_type
-            ORDER  BY count DESC
-        """)
-        by_attack_type = [dict(r) for r in cur.fetchall()]
-
-        cur.execute("""
-            SELECT severity, COUNT(*) AS count
-            FROM   attacks
-            WHERE  severity IS NOT NULL
-            GROUP  BY severity
-            ORDER  BY count DESC
-        """)
-        by_severity = [dict(r) for r in cur.fetchall()]
-
-        cur.execute("""
-            SELECT date_trunc('hour', timestamp) AS hour,
-                   COUNT(*) AS count
-            FROM   attacks
-            WHERE  timestamp >= NOW() - INTERVAL '24 hours'
-            GROUP  BY hour
-            ORDER  BY hour
-        """)
-        hourly = [dict(r) for r in cur.fetchall()]
-
-        conn.close()
+        async with _pool().acquire() as conn:
+            by_event = await conn.fetch("""
+                SELECT event_type, COUNT(*) AS count
+                FROM   attacks
+                GROUP  BY event_type
+                ORDER  BY count DESC
+            """)
+            by_attack_type = await conn.fetch("""
+                SELECT attack_type, COUNT(*) AS count
+                FROM   attacks
+                WHERE  attack_type IS NOT NULL
+                GROUP  BY attack_type
+                ORDER  BY count DESC
+            """)
+            by_severity = await conn.fetch("""
+                SELECT severity, COUNT(*) AS count
+                FROM   attacks
+                WHERE  severity IS NOT NULL
+                GROUP  BY severity
+                ORDER  BY count DESC
+            """)
+            hourly = await conn.fetch("""
+                SELECT date_trunc('hour', timestamp) AS hour,
+                       COUNT(*) AS count
+                FROM   attacks
+                WHERE  timestamp >= NOW() - INTERVAL '24 hours'
+                GROUP  BY hour
+                ORDER  BY hour
+            """)
         return {
-            "by_event_type":  by_event,
-            "by_attack_type": by_attack_type,
-            "by_severity":    by_severity,
-            "hourly_24h":     hourly,
+            "by_event_type":  _recs(by_event),
+            "by_attack_type": _recs(by_attack_type),
+            "by_severity":    _recs(by_severity),
+            "hourly_24h":     _recs(hourly),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/sessions")
-def sessions(limit: int = Query(20, ge=1, le=200)):
+async def sessions(limit: int = Query(20, ge=1, le=200)):
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-        cur.execute("""
-            SELECT id, session_id, src_ip, start_time, end_time,
-                   duration_sec, login_attempts, login_successes, commands_run,
-                   hassh, honeypot, created_at
-            FROM   sessions
-            ORDER  BY start_time DESC
-            LIMIT  %s
-        """, (limit,))
-        rows = cur.fetchall()
-        conn.close()
-        return {"count": len(rows), "sessions": [dict(r) for r in rows]}
+        async with _pool().acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, session_id, src_ip, start_time, end_time,
+                       duration_sec, login_attempts, login_successes, commands_run,
+                       hassh, honeypot, created_at
+                FROM   sessions
+                ORDER  BY start_time DESC
+                LIMIT  $1
+            """, limit)
+        return {"count": len(rows), "sessions": _recs(rows)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/sessions/{session_id}")
-def session_detail(session_id: str):
+async def session_detail(session_id: str):
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-
-        cur.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
-        session = cur.fetchone()
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        cur.execute("""
-            SELECT id, event_type, username, password,
-                   command, timestamp, anomaly_score, severity, attack_type
-            FROM   attacks
-            WHERE  session_id = %s
-            ORDER  BY timestamp
-        """, (session_id,))
-        events = [dict(r) for r in cur.fetchall()]
-        conn.close()
-
-        return {"session": dict(session), "events": events}
+        async with _pool().acquire() as conn:
+            session = await conn.fetchrow(
+                "SELECT * FROM sessions WHERE session_id = $1", session_id
+            )
+            if not session:
+                raise HTTPException(status_code=404, detail="Session not found")
+            events = await conn.fetch("""
+                SELECT id, event_type, username, password,
+                       command, timestamp, anomaly_score, severity, attack_type
+                FROM   attacks
+                WHERE  session_id = $1
+                ORDER  BY timestamp
+            """, session_id)
+        return {"session": _rec(session), "events": _recs(events)}
     except HTTPException:
         raise
     except Exception as e:
@@ -391,27 +416,24 @@ def score_ip(ip: str):
 
 
 @app.get("/api/top-ips")
-def top_ips(limit: int = Query(10, ge=1, le=100)):
+async def top_ips(limit: int = Query(10, ge=1, le=100)):
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-        cur.execute("""
-            SELECT src_ip,
-                   COUNT(*)                                           AS total_events,
-                   COUNT(*) FILTER (WHERE event_type='login_failed')  AS failed_logins,
-                   COUNT(*) FILTER (WHERE event_type='login_success') AS successful_logins,
-                   COUNT(*) FILTER (WHERE event_type='command')       AS commands,
-                   MAX(timestamp)                                     AS last_seen,
-                   MAX(anomaly_score)                                 AS max_anomaly_score,
-                   MODE() WITHIN GROUP (ORDER BY attack_type)         AS top_attack_type
-            FROM   attacks
-            GROUP  BY src_ip
-            ORDER  BY total_events DESC
-            LIMIT  %s
-        """, (limit,))
-        rows = cur.fetchall()
-        conn.close()
-        return {"count": len(rows), "top_ips": [dict(r) for r in rows]}
+        async with _pool().acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT src_ip,
+                       COUNT(*)                                           AS total_events,
+                       COUNT(*) FILTER (WHERE event_type='login_failed')  AS failed_logins,
+                       COUNT(*) FILTER (WHERE event_type='login_success') AS successful_logins,
+                       COUNT(*) FILTER (WHERE event_type='command')       AS commands,
+                       MAX(timestamp)                                     AS last_seen,
+                       MAX(anomaly_score)                                 AS max_anomaly_score,
+                       MODE() WITHIN GROUP (ORDER BY attack_type)         AS top_attack_type
+                FROM   attacks
+                GROUP  BY src_ip
+                ORDER  BY total_events DESC
+                LIMIT  $1
+            """, limit)
+        return {"count": len(rows), "top_ips": _recs(rows)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -420,23 +442,16 @@ def top_ips(limit: int = Query(10, ge=1, le=100)):
 
 @app.get("/api/geoip/{ip}")
 async def geoip_single(ip: str):
-    """GeoIP lookup for a single IP."""
     return await _fetch_geoip(ip)
 
 
 @app.get("/api/geoip")
 async def geoip_batch(ips: str):
-    """
-    Batch GeoIP — pass comma-separated IPs.
-    e.g. GET /api/geoip?ips=1.2.3.4,5.6.7.8
-    Throttles uncached lookups to ~5/sec to respect ip-api.com 45 req/min limit.
-    """
     ip_list  = [i.strip() for i in ips.split(",") if i.strip()][:20]
     cached   = [ip for ip in ip_list if ip in _geoip_cache]
     uncached = [ip for ip in ip_list if ip not in _geoip_cache]
 
     results = {ip: _geoip_cache[ip] for ip in cached}
-
     for ip in uncached:
         results[ip] = await _fetch_geoip(ip)
         if len(uncached) > 5:
@@ -454,23 +469,22 @@ async def ws_live(websocket: WebSocket):
     await hub.connect(websocket)
     last_id = 0
 
+    # Send history immediately after accept — pool is already warm
     try:
-        conn = _get_conn()
-        cur  = conn.cursor()
-        cur.execute("""
-            SELECT id, src_ip, event_type, username,
-                   timestamp, session_id, anomaly_score, severity, attack_type
-            FROM   attacks
-            ORDER  BY id DESC
-            LIMIT  10
-        """)
-        rows = list(reversed(cur.fetchall()))
-        conn.close()
+        async with _pool().acquire() as conn:
+            rows = await conn.fetch("""
+                SELECT id, src_ip, event_type, username,
+                       timestamp, session_id, anomaly_score, severity, attack_type
+                FROM   attacks
+                ORDER  BY id DESC
+                LIMIT  10
+            """)
+        rows = list(reversed(rows))
         if rows:
             last_id = rows[-1]["id"]
             await websocket.send_json({
                 "type":    "history",
-                "attacks": [_ws_row(r) for r in rows],
+                "attacks": _recs(rows),
             })
     except Exception:
         pass
@@ -479,36 +493,26 @@ async def ws_live(websocket: WebSocket):
         while True:
             await asyncio.sleep(2)
             try:
-                conn = _get_conn()
-                cur  = conn.cursor()
-                cur.execute("""
-                    SELECT id, src_ip, event_type, username,
-                           timestamp, session_id, anomaly_score,
-                           severity, attack_type
-                    FROM   attacks
-                    WHERE  id > %s
-                    ORDER  BY id ASC
-                    LIMIT  50
-                """, (last_id,))
-                rows = cur.fetchall()
-                conn.close()
+                async with _pool().acquire() as conn:
+                    rows = await conn.fetch("""
+                        SELECT id, src_ip, event_type, username,
+                               timestamp, session_id, anomaly_score,
+                               severity, attack_type
+                        FROM   attacks
+                        WHERE  id > $1
+                        ORDER  BY id ASC
+                        LIMIT  50
+                    """, last_id)
                 if rows:
                     last_id = rows[-1]["id"]
                     await websocket.send_json({
                         "type":    "new_attacks",
-                        "attacks": [_ws_row(r) for r in rows],
+                        "attacks": _recs(rows),
                     })
             except Exception:
                 pass
     except WebSocketDisconnect:
         hub.disconnect(websocket)
-
-
-def _ws_row(row: Any) -> dict:
-    d = dict(row)
-    if isinstance(d.get("timestamp"), datetime):
-        d["timestamp"] = d["timestamp"].isoformat()
-    return d
 
 
 if __name__ == "__main__":
