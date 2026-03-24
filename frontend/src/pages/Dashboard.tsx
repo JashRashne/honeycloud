@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Header } from '../components/Header'
+import { AppShell } from '../components/AppShell'
 import { MetricCards } from '../components/MetricCards'
 import { LiveFeed } from '../components/LiveFeed'
 import { AttackTypeDonut } from '../components/AttackTypeDonut'
@@ -25,43 +25,45 @@ export function Dashboard() {
   const totalAttacks = stats?.by_event_type.reduce((s, r) => s + r.count, 0) ?? 0
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--void)', fontFamily: 'var(--font-display)' }}>
-      <Header connected={connected} totalAttacks={totalAttacks} newCount={newCount} />
+    <AppShell connected={connected} totalAttacks={totalAttacks} newCount={newCount}>
+      <div className="page-body">
 
-      <main style={{ maxWidth: 1600, margin: '0 auto', padding: '20px 28px 48px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-        {/* Section label */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 4 }}>
-          <div className="pulse-dot" style={{ width: 5, height: 5 }} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.2em' }}>
-            COMMAND CENTER · REAL-TIME OVERVIEW
-          </span>
+        {/* Page header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4, borderBottom: '1px solid var(--bdr)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="live-dot amber" />
+            <div>
+              <h1 style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--char)', letterSpacing: '-.01em', lineHeight: 1 }}>Live Dashboard</h1>
+              <div className="label" style={{ fontSize: 8, marginTop: 3, color: 'var(--char6)' }}>Real-time attack monitoring</div>
+            </div>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char5)' }}>
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </div>
         </div>
 
-        {/* Row 1 — metric cards */}
+        {/* Metric cards */}
         <MetricCards stats={stats} attacks={attacks} />
 
-        {/* Row 2 — map (3fr) + live feed (2fr) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 14 }}>
+        {/* Map + Feed */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 18 }}>
           <AttackMap />
           <LiveFeed attacks={attacks} />
         </div>
 
-        {/* Row 3 — donut + hourly timeline */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 14 }}>
+        {/* Donut + Hourly */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 18 }}>
           <AttackTypeDonut stats={stats} />
           <HourlyTimeline stats={stats} />
         </div>
 
-        {/* Row 4 — top IPs (3fr) + Bi-LSTM (2fr) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 14 }}>
+        {/* Top IPs + BiLSTM */}
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 18 }}>
           <TopIPs refreshTrigger={newCount} />
           <BiLSTMForecast refreshTrigger={newCount} />
         </div>
 
-        {/* Row 5 — session kill chain full width */}
-        <SessionKillChain refreshTrigger={newCount} />
-      </main>
-    </div>
+      </div>
+    </AppShell>
   )
 }

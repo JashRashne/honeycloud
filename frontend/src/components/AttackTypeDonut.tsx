@@ -1,131 +1,43 @@
+// AttackTypeDonut.tsx
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Stats } from '../types'
+const PAL = ['#E8960C', '#B91C1C', '#C2410C', '#065F46', '#1D4ED8', '#7C3AED', '#BE185D', '#0F766E', '#92400E']
+const REMAP: Record<string, string> = { ssh_bruteforce: 'SSH Bruteforce', vnc_bruteforce: 'VNC Bruteforce', web_scan: 'Web Scanning', telnet_probe: 'Telnet Probe', db_probe: 'Database Probe', smb_exploit: 'SMB Exploit', ftp_probe: 'FTP Probe', snmp_probe: 'SNMP Probe', iot_probe: 'IoT Probe', port_scan: 'Port Scan', icmp_scan: 'ICMP Scan' }
 
-const PALETTE = [
-  '#FBC64C', '#FF3B3B', '#FF8800', '#3DDB7A',
-  '#60a5fa', '#a78bfa', '#f472b6', '#34d399',
-  '#fb923c', '#B28742',
-]
-
-const REMAP: Record<string, string> = {
-  ssh_bruteforce: 'SSH Brute',
-  vnc_bruteforce: 'VNC Brute',
-  web_scan: 'Web Scan',
-  telnet_probe: 'Telnet',
-  db_probe: 'DB Probe',
-  smb_exploit: 'SMB',
-  ftp_probe: 'FTP',
-  snmp_probe: 'SNMP',
-  iot_probe: 'IoT',
-  port_scan: 'Port Scan',
-  icmp_scan: 'ICMP',
-}
-
-interface Props { stats: Stats | null }
-
-export function AttackTypeDonut({ stats }: Props) {
-  const data = (stats?.by_attack_type ?? [])
-    .slice(0, 8)
-    .map(r => ({ name: REMAP[r.attack_type] ?? r.attack_type, value: r.count }))
-
+export function AttackTypeDonut({ stats }: { stats: Stats | null }) {
+  const data = (stats?.by_attack_type ?? []).slice(0, 8).map(r => ({ name: REMAP[r.attack_type] ?? r.attack_type, value: r.count }))
   const total = data.reduce((s, d) => s + d.value, 0)
-
   return (
-    <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, overflow: 'hidden' }}>
-      <div style={{
-        padding: '12px 18px',
-        borderBottom: '1px solid var(--void-4)',
-        background: 'rgba(251,198,76,0.02)',
-      }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', letterSpacing: '0.18em' }}>
-          ATTACK DISTRIBUTION
-        </span>
-      </div>
-
+    <div className="panel au d1">
+      <div className="panel-hd"><span className="label">Attack Breakdown</span></div>
       {data.length === 0 ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
-          no data yet
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}><div className="skeleton" style={{ width: 120, height: 120, borderRadius: '50%' }} /></div>
       ) : (
-        <div style={{ padding: '16px 18px' }}>
+        <div style={{ padding: '16px 20px' }}>
           <div style={{ position: 'relative', height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={data}
-                  cx="50%" cy="50%"
-                  innerRadius={62} outerRadius={88}
-                  paddingAngle={2}
-                  dataKey="value"
-                  strokeWidth={0}
-                >
-                  {data.map((_, i) => (
-                    <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
-                  ))}
+                <Pie data={data} cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={2} dataKey="value" strokeWidth={0}>
+                  {data.map((_, i) => <Cell key={i} fill={PAL[i % PAL.length]} />)}
                 </Pie>
-                <Tooltip
-                  formatter={(value) => [`${Number(value)} events (${((Number(value) / total) * 100).toFixed(1)}%)`, '']}
-                  contentStyle={{
-                    background: 'var(--void-2)',
-                    border: '1px solid var(--void-4)',
-                    borderRadius: 2, fontSize: 11,
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--antiquity-2)',
-                  }}
-                />
+                <Tooltip formatter={(v) => [`${Number(v)} events (${((Number(v) / total) * 100).toFixed(1)}%)`, '']} contentStyle={{ background: 'var(--surf)', border: '1px solid var(--bdr)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--char)' }} />
               </PieChart>
             </ResponsiveContainer>
-
-            {/* Centre label */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none',
-            }}>
-              <span style={{
-                fontFamily: 'var(--font-display)', fontWeight: 800,
-                fontSize: 30, color: 'var(--antiquity)', lineHeight: 1,
-                letterSpacing: '-0.02em',
-              }}>
-                {total.toLocaleString()}
-              </span>
-              <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)',
-                letterSpacing: '0.14em', marginTop: 5,
-              }}>
-                EVENTS
-              </span>
+            <div className="donut-center">
+              <span style={{ fontFamily: 'var(--serif)', fontSize: 28, color: 'var(--char)', lineHeight: 1 }}>{total.toLocaleString()}</span>
+              <span className="label" style={{ marginTop: 4, fontSize: 8 }}>total</span>
             </div>
           </div>
-
-          {/* Legend */}
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
             {data.map((d, i) => (
               <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: PALETTE[i % PALETTE.length],
-                    flexShrink: 0,
-                    boxShadow: `0 0 5px ${PALETTE[i % PALETTE.length]}66`,
-                  }} />
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--antiquity-3)' }}>
-                    {d.name}
-                  </span>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: PAL[i % PAL.length], flexShrink: 0 }} />
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char3)' }}>{d.name}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 56, background: 'var(--void-4)', borderRadius: 1, height: 3 }}>
-                    <div style={{
-                      width: `${(d.value / total) * 100}%`,
-                      height: 3,
-                      background: PALETTE[i % PALETTE.length],
-                      borderRadius: 1,
-                    }} />
-                  </div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--bronze-3)', minWidth: 24, textAlign: 'right' }}>
-                    {d.value}
-                  </span>
+                  <div className="bar-track" style={{ width: 54, height: 3 }}><div className="bar-fill" style={{ width: `${(d.value / total) * 100}%`, background: PAL[i % PAL.length] }} /></div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char5)', minWidth: 24, textAlign: 'right' }}>{d.value}</span>
                 </div>
               </div>
             ))}

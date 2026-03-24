@@ -1,219 +1,127 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getSessions, getSessionDetail } from '../api/clients'
 import type { Session, SessionDetail } from '../types'
 
-const KILL_CHAIN = [
-  { stage: 'connect', label: 'Initial Access', tactic: 'Reconnaissance', color: '#60a5fa' },
-  { stage: 'login_failed', label: 'Brute Force', tactic: 'Credential Access', color: '#FBC64C' },
-  { stage: 'login_success', label: 'Credential Access', tactic: 'Initial Access', color: '#FF8800' },
-  { stage: 'command', label: 'Execution', tactic: 'Execution', color: '#FF3B3B' },
-  { stage: 'disconnect', label: 'Complete', tactic: 'Exfiltration', color: '#B28742' },
+const CHAIN = [
+  { stage: 'connect', label: 'First Contact', tactic: 'Recon', color: '#2563EB', emoji: '🔌' },
+  { stage: 'login_failed', label: 'Trying Passwords', tactic: 'Brute Force', color: '#D97706', emoji: '🚫' },
+  { stage: 'login_success', label: 'Got In', tactic: 'Cred Access', color: '#DC2626', emoji: '🔓' },
+  { stage: 'command', label: 'Running Commands', tactic: 'Execution', color: '#991B1B', emoji: '💻' },
+  { stage: 'disconnect', label: 'Left', tactic: 'Exfiltration', color: '#6B7280', emoji: '👋' },
 ]
 
-const STAGE_BADGE: Record<string, { bg: string; color: string; border: string }> = {
-  connect: { bg: 'rgba(96,165,250,0.1)', color: '#60a5fa', border: 'rgba(96,165,250,0.3)' },
-  login_failed: { bg: 'rgba(251,198,76,0.1)', color: '#FBC64C', border: 'rgba(251,198,76,0.3)' },
-  login_success: { bg: 'rgba(255,136,0,0.1)', color: '#FF8800', border: 'rgba(255,136,0,0.3)' },
-  command: { bg: 'rgba(255,59,59,0.1)', color: '#FF3B3B', border: 'rgba(255,59,59,0.3)' },
-  disconnect: { bg: 'rgba(178,135,66,0.1)', color: '#B28742', border: 'rgba(178,135,66,0.3)' },
-}
+const BADGE_CLS: Record<string, string> = { connect: 'chip chip-low', login_failed: 'chip chip-medium', login_success: 'chip chip-high', command: 'chip chip-critical', disconnect: 'chip' }
 
 function fmt(ts: string) { return new Date(ts).toUTCString().slice(17, 25) }
-
-function duration(sec: number | null) {
-  if (!sec) return '—'
-  if (sec < 60) return `${sec.toFixed(0)}s`
-  return `${(sec / 60).toFixed(1)}m`
-}
-
-function asArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (typeof value === 'string') {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) return parsed as T[]
-    } catch {
-      return []
-    }
-  }
-  return []
-}
+function dur(s: number | null) { if (!s) return '—'; return s < 60 ? `${s.toFixed(0)}s` : `${(s / 60).toFixed(1)}m` }
+function asArr<T>(v: unknown): T[] { if (Array.isArray(v)) return v as T[]; if (typeof v === 'string') { try { const p = JSON.parse(v); if (Array.isArray(p)) return p as T[] } catch { } } return [] }
 
 export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }) {
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
-  const [detail, setDetail] = useState<SessionDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [sessions, setS] = useState<Session[]>([])
+  const [sel, setSel] = useState<string | null>(null)
+  const [detail, setD] = useState<SessionDetail | null>(null)
+  const [loading, setL] = useState(true)
+  const [dloading, setDL] = useState(false)
+  const lastSel = useRef<string | null>(null)
 
   useEffect(() => {
-    getSessions(10).then(r => {
-      setSessions(r.sessions)
-      if (r.sessions.length > 0 && !selected) setSelected(r.sessions[0].session_id)
-      setLoading(false)
-    }).catch(() => setLoading(false))
-    const t = setInterval(() =>
-      getSessions(10).then(r => setSessions(r.sessions)).catch(() => { }), 30_000)
+    const fetchS = () => getSessions(15).then(r => { 
+      setS(r.sessions); 
+      if (r.sessions.length > 0 && !sel) setSel(r.sessions[0].session_id); 
+      setL(false) 
+    }).catch(() => setL(false))
+    
+    fetchS()
+    const t = setInterval(fetchS, 30_000)
     return () => clearInterval(t)
   }, [refreshTrigger])
 
   useEffect(() => {
-    if (!selected) return
-    const isNew = !detail || detail.session.session_id !== selected
-    if (isNew) { setDetailLoading(true); setDetail(null) }
-    getSessionDetail(selected)
-      .then(setDetail)
-      .catch(() => { })
-      .finally(() => setDetailLoading(false))
-  }, [selected])
+    if (!sel) return
+    const isNew = sel !== lastSel.current
+    if (isNew) {
+      setDL(true)
+      setD(null)
+      lastSel.current = sel
+    }
+    getSessionDetail(sel).then(setD).catch(() => { }).finally(() => {
+      if (isNew) setDL(false)
+    })
+  }, [sel, refreshTrigger])
 
-  const events = asArray<SessionDetail['events'][number]>(detail?.events)
-  const credentials = asArray<{ username: string; password: string }>(detail?.session?.credentials)
-  const commands = asArray<string>(detail?.session?.commands).filter((cmd): cmd is string => typeof cmd === 'string')
-
-  // Which stages appeared in this session
-  const stagesHit = new Set(events.map(e => e.event_type))
+  const events = asArr<SessionDetail['events'][number]>(detail?.events)
+  const creds = asArr<{ username: string; password: string }>(detail?.session?.credentials)
+  const commands = asArr<string>(detail?.session?.commands).filter((c): c is string => typeof c === 'string')
+  const hit = new Set(events.map(e => e.event_type))
 
   return (
-    <div style={{ background: 'var(--void-2)', border: '1px solid var(--void-4)', borderRadius: 2, overflow: 'hidden' }}>
-      {/* Header */}
-      <div style={{
-        padding: '12px 18px',
-        borderBottom: '1px solid var(--void-4)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'rgba(251,198,76,0.02)',
-      }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)', letterSpacing: '0.18em' }}>
-          INFECTION TIMELINE
-        </span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>
-          {sessions.length} sessions
-        </span>
+    <div className="panel au">
+      <div className="panel-hd">
+        <span className="label">Attack Sessions — Step by Step</span>
+        <span className="label" style={{ color: 'var(--char6)' }}>{sessions.length} recorded</span>
       </div>
 
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
-          loading...
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 100, gap: 10 }}>
+          <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+          <span className="label" style={{ color: 'var(--char6)' }}>Loading sessions…</span>
         </div>
       )}
 
       {!loading && sessions.length === 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
-          no sessions yet
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 100 }}>
+          <span className="label" style={{ color: 'var(--char6)' }}>No sessions recorded yet</span>
         </div>
       )}
 
       {!loading && sessions.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', borderTop: '1px solid var(--void-4)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr' }}>
 
           {/* Session list */}
-          <div style={{ borderRight: '1px solid var(--void-4)', overflowY: 'auto', maxHeight: 500 }}>
+          <div style={{ borderRight: '1px solid var(--bdr)', overflowY: 'auto', maxHeight: 560 }}>
             {sessions.map(s => {
-              const active = s.session_id === selected
+              const act = s.session_id === sel
               return (
-                <div
-                  key={s.session_id}
-                  onClick={() => setSelected(s.session_id)}
-                  style={{
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid rgba(20,16,10,0.8)',
-                    background: active ? 'rgba(251,198,76,0.06)' : 'transparent',
-                    borderLeft: active ? '2px solid var(--amber)' : '2px solid transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
+                <div key={s.session_id} onClick={() => setSel(s.session_id)} style={{ padding: '12px 16px', cursor: 'pointer', borderBottom: '1px solid var(--bdr)', borderLeft: `3px solid ${act ? 'var(--amber)' : 'transparent'}`, background: act ? 'var(--amber-p2)' : 'transparent', transition: 'all .15s' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                    <span style={{
-                      fontFamily: 'var(--font-mono)', fontSize: 11,
-                      color: active ? 'var(--amber)' : 'var(--antiquity-2)',
-                      fontWeight: active ? 600 : 400,
-                    }}>
-                      {s.src_ip}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)' }}>
-                      {duration(s.duration_sec)}
-                    </span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: act ? 'var(--amber)' : 'var(--char2)', fontWeight: act ? 600 : 400 }}>{s.src_ip}</span>
+                    <span className="label" style={{ fontSize: 8 }}>{dur(s.duration_sec)}</span>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--bronze-3)' }}>
-                    {s.login_attempts} attempts · {s.commands_run} cmds
-                  </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'rgba(107,90,62,0.35)', marginTop: 2 }}>
-                    {s.session_id.slice(0, 12)}
-                  </div>
+                  <div className="label" style={{ fontSize: 8, color: 'var(--char6)' }}>{s.login_attempts} attempts · {s.commands_run} commands run</div>
+                  <div className="label" style={{ fontSize: 7, color: 'var(--char6)', marginTop: 2, opacity: .5 }}>{s.session_id.slice(0, 12)}</div>
                 </div>
               )
             })}
           </div>
 
-          {/* Kill chain detail */}
-          <div style={{ padding: 22, overflowY: 'auto', maxHeight: 500 }}>
-            {detailLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--bronze-3)' }}>
-                loading session...
+          {/* Detail */}
+          <div style={{ padding: 24, overflowY: 'auto', maxHeight: 560 }}>
+            {dloading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 32 }} />)}
               </div>
             )}
 
-            {!detailLoading && detail && (
+            {!dloading && detail && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
-                {/* ── Kill chain — horizontal progress ── */}
+                {/* Kill chain — icons row */}
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--bronze-3)', letterSpacing: '0.16em', marginBottom: 18 }}>
-                    ATTACK PROGRESSION
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    {KILL_CHAIN.map((kc, i) => {
-                      const hit = stagesHit.has(kc.stage)
+                  <div className="label" style={{ marginBottom: 16, fontSize: 8 }}>Attack progression</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    {CHAIN.map((kc, i) => {
+                      const active = hit.has(kc.stage)
                       return (
                         <div key={kc.stage} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-                            {/* Node */}
-                            <div style={{
-                              width: 34, height: 34, borderRadius: '50%',
-                              background: hit ? kc.color : 'var(--void-4)',
-                              border: `2px solid ${hit ? kc.color : 'var(--void-4)'}`,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              boxShadow: hit ? `0 0 14px ${kc.color}55` : 'none',
-                              marginBottom: 7,
-                              transition: 'all 0.35s',
-                              position: 'relative',
-                              flexShrink: 0,
-                            }}>
-                              {hit && (
-                                <>
-                                  {/* Outer ring */}
-                                  <div style={{
-                                    position: 'absolute', inset: -8,
-                                    borderRadius: '50%',
-                                    border: `1px solid ${kc.color}30`,
-                                    animation: 'glow-pulse 2s ease-in-out infinite',
-                                  }} />
-                                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'rgba(255,255,255,0.6)' }} />
-                                </>
-                              )}
+                            <div className={`kc-node${active ? ' hit' : ''}`} style={{ background: active ? kc.color : 'var(--cream-2)', color: active ? kc.color : 'var(--char6)', border: `2px solid ${active ? kc.color : 'var(--bdr2)'}`, boxShadow: active ? `0 0 0 4px ${kc.color}22` : 'none' }}>
+                              {active && <div style={{ width: 11, height: 11, borderRadius: '50%', background: 'rgba(255,255,255,.75)' }} />}
                             </div>
-                            {/* Labels */}
-                            <span style={{
-                              fontFamily: 'var(--font-mono)', fontSize: 7,
-                              color: hit ? kc.color : 'var(--bronze-3)',
-                              textAlign: 'center', lineHeight: 1.4,
-                              letterSpacing: '0.04em',
-                            }}>
-                              {kc.label}
-                            </span>
-                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 6, color: 'var(--bronze-3)', opacity: 0.5, textAlign: 'center', marginTop: 2 }}>
-                              {kc.tactic}
-                            </span>
+                            <div style={{ fontFamily: 'var(--sans)', fontSize: 9, color: active ? kc.color : 'var(--char6)', textAlign: 'center', lineHeight: 1.3, marginTop: 6, fontWeight: active ? 600 : 400 }}>{kc.label}</div>
+                            <div className="label" style={{ fontSize: 6, color: 'var(--char6)', marginTop: 2, opacity: .6 }}>{kc.tactic}</div>
                           </div>
-                          {i < KILL_CHAIN.length - 1 && (
-                            <div style={{
-                              height: 1, flex: 1, marginBottom: 28,
-                              background: stagesHit.has(KILL_CHAIN[i + 1].stage)
-                                ? 'linear-gradient(90deg, var(--bronze), var(--amber))'
-                                : 'var(--void-4)',
-                              transition: 'background 0.3s',
-                            }} />
+                          {i < CHAIN.length - 1 && (
+                            <div style={{ height: 2, flex: 1, marginBottom: 28, background: hit.has(CHAIN[i + 1].stage) ? 'linear-gradient(90deg,var(--amber),var(--amber-l))' : 'var(--bdr)', transition: 'background .3s' }} />
                           )}
                         </div>
                       )
@@ -221,83 +129,72 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
                   </div>
                 </div>
 
-                {/* Stats grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {/* Stats */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
                   {[
-                    { label: 'DURATION', value: duration(detail.session.duration_sec) },
-                    { label: 'LOGIN TRIES', value: detail.session.login_attempts },
-                    { label: 'SUCCESSES', value: detail.session.login_successes },
-                    { label: 'COMMANDS', value: detail.session.commands_run },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{
-                      background: 'rgba(251,198,76,0.03)',
-                      border: '1px solid var(--void-4)',
-                      borderRadius: 2, padding: '10px 12px', textAlign: 'center',
-                    }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--antiquity)', lineHeight: 1 }}>{value}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 7, color: 'var(--bronze-3)', marginTop: 5, letterSpacing: '0.12em' }}>{label}</div>
+                    { label: 'Duration', val: dur(detail.session.duration_sec) },
+                    { label: 'Password tries', val: detail.session.login_attempts },
+                    { label: 'Broke in', val: detail.session.login_successes },
+                    { label: 'Commands run', val: detail.session.commands_run },
+                  ].map(s => (
+                    <div key={s.label} style={{ background: 'var(--surf2)', border: '1px solid var(--bdr)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
+                      <div style={{ fontFamily: 'var(--serif)', fontSize: 24, color: 'var(--char)', lineHeight: 1, letterSpacing: '-.01em' }}>{s.val}</div>
+                      <div className="label" style={{ fontSize: 7, marginTop: 5 }}>{s.label}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Credentials captured */}
-                {credentials.length > 0 && (
+                {/* Creds */}
+                {creds.length > 0 && (
                   <div>
-                    <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
-                      Credentials Attempted
-                    </p>
-                    <div className="space-y-1 max-h-28 overflow-y-auto">
-                      {credentials.slice(0, 8).map((c, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
-                          <span className="text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{c.username}</span>
-                          <span className="text-stone-300">/</span>
-                          <span className="text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{c.password}</span>
+                    <div className="label" style={{ marginBottom: 8, fontSize: 8 }}>Passwords they tried</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 96, overflowY: 'auto' }}>
+                      {creds.slice(0, 8).map((c, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--surf2)', border: '1px solid var(--bdr)', padding: '2px 6px', borderRadius: 4, color: 'var(--char3)' }}>{c.username}</span>
+                          <span style={{ color: 'var(--char6)' }}>/</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 10, background: 'var(--crit-bg)', border: '1px solid var(--crit-b)', padding: '2px 6px', borderRadius: 4, color: 'var(--crit)' }}>{c.password}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Commands run */}
+                {/* Commands */}
                 {commands.length > 0 && (
                   <div>
-                    <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
-                      Commands Executed
-                    </p>
-                    <div className="bg-stone-900 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    <div className="label" style={{ marginBottom: 8, fontSize: 8 }}>Commands they ran</div>
+                    <div style={{ background: 'var(--char)', borderRadius: 8, padding: '12px 16px', maxHeight: 120, overflowY: 'auto' }}>
                       {commands.map((cmd, i) => (
-                        <div key={i} className="text-[11px] font-mono text-emerald-400 leading-5">
-                          <span className="text-stone-500 mr-2">$</span>{cmd}
+                        <div key={i} style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#4ade80', lineHeight: 1.9 }}>
+                          <span style={{ color: 'rgba(255,255,255,.2)', marginRight: 8 }}>$</span>{cmd}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Event timeline — vertical */}
+                {/* Event timeline */}
                 <div>
-                  <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
-                    Event Timeline
-                  </p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {events.map(e => (
-                      <div key={e.id} className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-stone-300 w-16 flex-shrink-0">
-                          {fmt(e.timestamp)}
-                        </span>
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${STAGE_COLOR[e.event_type] ?? 'bg-stone-100 text-stone-500 border-stone-200'}`}>
-                          {e.event_type.replace(/_/g, ' ')}
-                        </span>
-                        {e.command && (
-                          <span className="text-[10px] font-mono text-stone-500 truncate">{e.command}</span>
-                        )}
-                        {e.username && !e.command && (
-                          <span className="text-[10px] font-mono text-stone-400">{e.username}</span>
-                        )}
-                      </div>
-                    ))}
+                  <div className="label" style={{ marginBottom: 10, fontSize: 8 }}>Full event log</div>
+                  <div className="vtl" style={{ maxHeight: 180, overflowY: 'auto' }}>
+                    {events.map((e, i) => {
+                      const kc = CHAIN.find(k => k.stage === e.event_type)
+                      return (
+                        <div key={e.id} className="vtl-item">
+                          <div className="vtl-dot" style={{ background: kc?.color ?? 'var(--char6)' }} />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--char6)', minWidth: 52, flexShrink: 0 }}>{fmt(e.timestamp)}</span>
+                            <span className={BADGE_CLS[e.event_type] ?? 'chip'} style={{ flexShrink: 0 }}>{e.event_type.replace(/_/g, ' ')}</span>
+                            {e.command && <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--char5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.command}</span>}
+                            {e.username && !e.command && <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--char5)' }}>{e.username}</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
+
               </div>
             )}
           </div>
