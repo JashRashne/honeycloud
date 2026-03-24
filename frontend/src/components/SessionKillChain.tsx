@@ -40,6 +40,19 @@ function duration(sec: number | null) {
   return `${(sec / 60).toFixed(1)}m`
 }
 
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) return parsed as T[]
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 export function SessionKillChain() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -70,8 +83,12 @@ export function SessionKillChain() {
       .finally(() => setDetailLoading(false))
   }, [selected])
 
+  const events = asArray<SessionDetail['events'][number]>(detail?.events)
+  const credentials = asArray<{ username: string; password: string }>(detail?.session?.credentials)
+  const commands = asArray<string>(detail?.session?.commands).filter((cmd): cmd is string => typeof cmd === 'string')
+
   // Which stages appeared in this session
-  const stagesHit = new Set(detail?.events.map(e => e.event_type) ?? [])
+  const stagesHit = new Set(events.map(e => e.event_type))
 
   return (
     <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
@@ -181,13 +198,13 @@ export function SessionKillChain() {
                 </div>
 
                 {/* Credentials captured */}
-                {detail.session.credentials.length > 0 && (
+                {credentials.length > 0 && (
                   <div>
                     <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
                       Credentials Attempted
                     </p>
                     <div className="space-y-1 max-h-28 overflow-y-auto">
-                      {detail.session.credentials.slice(0, 8).map((c, i) => (
+                      {credentials.slice(0, 8).map((c, i) => (
                         <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
                           <span className="text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded">{c.username}</span>
                           <span className="text-stone-300">/</span>
@@ -199,13 +216,13 @@ export function SessionKillChain() {
                 )}
 
                 {/* Commands run */}
-                {detail.session.commands.length > 0 && (
+                {commands.length > 0 && (
                   <div>
                     <p className="text-[10px] text-stone-400 uppercase tracking-widest font-semibold mb-2">
                       Commands Executed
                     </p>
                     <div className="bg-stone-900 rounded-lg p-3 max-h-32 overflow-y-auto">
-                      {detail.session.commands.map((cmd, i) => (
+                      {commands.map((cmd, i) => (
                         <div key={i} className="text-[11px] font-mono text-emerald-400 leading-5">
                           <span className="text-stone-500 mr-2">$</span>{cmd}
                         </div>
@@ -220,7 +237,7 @@ export function SessionKillChain() {
                     Event Timeline
                   </p>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {detail.events.map(e => (
+                    {events.map(e => (
                       <div key={e.id} className="flex items-center gap-2">
                         <span className="text-[10px] font-mono text-stone-300 w-16 flex-shrink-0">
                           {fmt(e.timestamp)}
