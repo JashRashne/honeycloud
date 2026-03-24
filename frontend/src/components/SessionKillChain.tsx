@@ -24,29 +24,43 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
   const [dloading, setDL] = useState(false)
   const lastSel = useRef<string | null>(null)
 
+  // 1. Fetch sessions list (Refreshes on new attacks OR selection change)
   useEffect(() => {
-    const fetchS = () => getSessions(15).then(r => { 
-      setS(r.sessions); 
-      if (r.sessions.length > 0 && !sel) setSel(r.sessions[0].session_id); 
+    let active = true
+    const fetchS = () => getSessions(20).then(r => { 
+      if (!active) return
+      setS(r.sessions)
+      // Auto-select first session ONLY if nothing is selected
+      if (r.sessions.length > 0 && !sel) setSel(r.sessions[0].session_id)
       setL(false) 
-    }).catch(() => setL(false))
+    }).catch(() => { if (active) setL(false) })
     
     fetchS()
-    const t = setInterval(fetchS, 30_000)
-    return () => clearInterval(t)
-  }, [refreshTrigger])
+    const t = setInterval(fetchS, 10000) // Poll list every 10s
+    return () => { active = false; clearInterval(t) }
+  }, [refreshTrigger, sel])
 
+  // 2. Fetch session details (Refreshes on selection change OR new attacks)
   useEffect(() => {
     if (!sel) return
+    let active = true
     const isNew = sel !== lastSel.current
+    
     if (isNew) {
       setDL(true)
       setD(null)
       lastSel.current = sel
     }
-    getSessionDetail(sel).then(setD).catch(() => { }).finally(() => {
-      if (isNew) setDL(false)
+    
+    const fetchD = () => getSessionDetail(sel).then(data => {
+      if (active) setD(data)
+    }).catch(() => {}).finally(() => {
+      if (active) setDL(false)
     })
+
+    fetchD()
+    const t = setInterval(fetchD, 5000) // Poll detail every 5s for active session
+    return () => { active = false; clearInterval(t) }
   }, [sel, refreshTrigger])
 
   const events = asArr<SessionDetail['events'][number]>(detail?.events)
