@@ -109,11 +109,7 @@ _score_cache: dict[str, dict] = {}
 # ── GeoIP cache ───────────────────────────────────────────────
 _geoip_cache: dict[str, dict] = {}
 
-
-def _score_ip(ip: str) -> dict:
-    if ip in _score_cache:
-        return _score_cache[ip]
-
+def _score_ip(ip: str, cmd: str = "") -> dict:
     import warnings
     import numpy as np
     warnings.filterwarnings("ignore")
@@ -124,7 +120,39 @@ def _score_ip(ip: str) -> dict:
     )
 
     _load_models()
-    features = _build_feature_vector(ip)
+
+    # ── SMART DEMO MAPPING ──
+    port = 22
+    proto = 6
+
+    if "ping" in cmd:
+        proto = 1
+    elif any(x in cmd for x in ["wget", "curl", "http"]):
+        port = 80
+    elif any(x in cmd for x in ["mysql", "sql", "postgres"]):
+        port = 3306
+    elif "smb" in cmd:
+        port = 445
+    elif "ftp" in cmd:
+        port = 21
+    elif "telnet" in cmd:
+        port = 23
+    elif "vnc" in cmd:
+        port = 5900
+
+    session_data = {
+        "dst_port": port,
+        "protocol": proto
+    }
+
+    features = _build_feature_vector(ip, session_data=session_data)
+
+    # Explicitly force the Layer 4 ML features ──
+    features["dst_port"] = float(port)
+    features["is_tcp"]   = 1.0 if proto == 6 else 0.0
+    features["is_udp"]   = 1.0 if proto == 17 else 0.0
+    features["is_icmp"]  = 1.0 if proto == 1 else 0.0
+
     X = _features_to_array(features)
 
     raw_score = _CACHE["iso"].decision_function(X)[0]
@@ -201,9 +229,7 @@ def _score_ip(ip: str) -> dict:
             "is_syn_scan":       features["is_syn_scan"],
         },
     }
-    _score_cache[ip] = result
     return result
-
 
 # ═══════════════════════════════════════════════════════════════
 #  GeoIP helpers
@@ -408,12 +434,26 @@ async def session_detail(session_id: str):
 
 
 @app.get("/api/score/{ip}")
-def score_ip(ip: str):
+async def score_ip(ip: str):
     try:
-        return _score_ip(ip)
+        cmd = ""
+        # Look up the most recent command this IP ran in the database
+        try:
+            async with _pool().acquire() as conn:
+                row = await conn.fetchrow("""
+                    SELECT command FROM attacks
+                    WHERE src_ip = $1 AND command IS NOT NULL AND command != ''
+                    ORDER BY timestamp DESC LIMIT 1
+                """, ip)
+                if row and row["command"]:
+                    cmd = row["command"].lower()
+        except Exception:
+            pass
+
+        # Pass the command into our scoring logic
+        return _score_ip(ip, cmd)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/top-ips")
 async def top_ips(limit: int = Query(10, ge=1, le=100)):

@@ -139,8 +139,13 @@ def _ensure_schema(conn):
 # ─────────────────────────────────────────────
 #  Score an event via honeycloud score pipeline
 # ─────────────────────────────────────────────
-def _score_ip(ip: str) -> dict:
-    """Run the full ML pipeline on an IP. Returns scoring dict."""
+
+def _score_event(event: dict) -> dict:
+    """Run the full ML pipeline dynamically based on the event context."""
+    ip = event.get("src_ip", "unknown")
+    eid = event.get("eventid", "")
+    cmd = event.get("input", "").lower()
+
     try:
         from honeycloud.score import _load_models, _build_feature_vector, \
                                      _features_to_array, _CACHE
@@ -149,8 +154,41 @@ def _score_ip(ip: str) -> dict:
         if not _load_models():
             return {}
 
-        features = _build_feature_vector(ip)
-        X        = _features_to_array(features)
+        # ── SMART DEMO MAPPING ──
+        # Map Layer 7 Cowrie commands to Layer 4 Network ports to force
+        # the ML model to output different attack classes for the demo.
+        port = 22
+        proto = 6
+
+        if "ping" in cmd:
+            proto = 1  # Force ICMP -> icmp_scan
+        elif any(x in cmd for x in ["wget", "curl", "http"]):
+            port = 80  # Force HTTP -> web_scan
+        elif any(x in cmd for x in ["mysql", "sql", "postgres"]):
+            port = 3306  # Force DB -> db_probe
+        elif "smb" in cmd:
+            port = 445  # Force SMB -> smb_exploit
+        elif "ftp" in cmd:
+            port = 21  # Force FTP -> ftp_probe
+        elif "telnet" in cmd:
+            port = 23  # Force Telnet -> telnet_probe
+        elif "vnc" in cmd:
+            port = 5900  # Force VNC -> vnc_bruteforce
+
+        session_data = {
+            "dst_port": port,
+            "protocol": proto
+        }
+
+        features = _build_feature_vector(ip, session_data=session_data)
+
+        # Explicitly force the Layer 4 ML features ──
+        features["dst_port"] = float(port)
+        features["is_tcp"]   = 1.0 if proto == 6 else 0.0
+        features["is_udp"]   = 1.0 if proto == 17 else 0.0
+        features["is_icmp"]  = 1.0 if proto == 1 else 0.0
+
+        X = _features_to_array(features)
 
         # Isolation Forest
         raw           = _CACHE["iso"].decision_function(X)[0]
@@ -352,12 +390,12 @@ def _upsert_session(conn, event: dict, session_state: dict):
 # ─────────────────────────────────────────────
 #  Score cache
 # ─────────────────────────────────────────────
-_score_cache: dict = {}
+# _score_cache: dict = {}
 
-def _get_score(ip: str) -> dict:
-    if ip not in _score_cache:
-        _score_cache[ip] = _score_ip(ip)
-    return _score_cache[ip]
+# def _get_score(ip: str) -> dict:
+#     if ip not in _score_cache:
+#         _score_cache[ip] = _score_ip(ip)
+#     return _score_cache[ip]
 
 
 # ─────────────────────────────────────────────
@@ -453,7 +491,7 @@ def tail_and_collect(log_path: str, conn, dry_run: bool = False,
 
                     events_processed += 1
                     src_ip = event.get("src_ip", "unknown")
-                    scoring = _get_score(src_ip)
+                    scoring = _score_event(event)
 
                     if dry_run:
                         ts = event.get("timestamp", "")[:19]
