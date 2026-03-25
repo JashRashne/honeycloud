@@ -22,7 +22,7 @@ export function HourlyTimeline({ stats }: { stats: Stats | null }) {
         <span className="label">Attack activity — last 24 hours</span>
         <span className="label" style={{ color: 'var(--char6)' }}>peak {max.toLocaleString()} / hr</span>
       </div>
-      <div style={{ padding: '16px 20px', height: 240 }}>
+      <div style={{ padding: '16px 20px', height: 400 }}>
         {raw.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 12 }}>
             {Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 24, width: `${40 + i * 10}%` }} />)}
