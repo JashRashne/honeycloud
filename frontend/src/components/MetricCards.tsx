@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { Zap, AlertTriangle, Users, Target, TrendingUp, TrendingDown } from 'lucide-react'
 import type { Stats, Attack } from '../types'
 
 interface CardProps {
   label: string; value: string; sub?: string; delta?: string; deltaUp?: boolean
-  accent: string; icon: string; idx: number; spark?: number[]
+  accent: string; icon: React.ReactNode; idx: number; spark?: number[]
 }
 
 function Card({ label, value, sub, delta, deltaUp, accent, icon, idx, spark }: CardProps) {
@@ -29,7 +30,7 @@ function Card({ label, value, sub, delta, deltaUp, accent, icon, idx, spark }: C
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
         <div className="label">{label}</div>
-        <span style={{ fontSize: 18, opacity: .55 }}>{icon}</span>
+        <span style={{ color: accent, opacity: .8 }}>{icon}</span>
       </div>
 
       <div className="mc-val" key={value}>{value}</div>
@@ -39,7 +40,7 @@ function Card({ label, value, sub, delta, deltaUp, accent, icon, idx, spark }: C
           {sub && <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char5)', marginTop: 2 }}>{sub}</div>}
           {delta && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, fontFamily: 'var(--mono)', fontSize: 9, padding: '2px 7px', borderRadius: 99, background: deltaUp ? 'var(--low-bg)' : 'var(--crit-bg)', color: deltaUp ? 'var(--low)' : 'var(--crit)', border: `1px solid ${deltaUp ? 'var(--low-b)' : 'var(--crit-b)'}` }}>
-              {deltaUp ? '↑' : '↓'} {delta}
+              {deltaUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />} {delta}
             </div>
           )}
         </div>
@@ -72,10 +73,10 @@ export function MetricCards({ stats, attacks }: { stats: Stats | null; attacks: 
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-      <Card label="Total Events" value={totalEvents.toLocaleString()} sub={`${stats?.by_event_type.length ?? 0} attack types seen`} accent="var(--amber)" icon="⚡" idx={0} spark={spark} />
-      <Card label="Critical / High" value={`${criticalCount} / ${highCount}`} sub="by severity level" accent="var(--crit)" icon="🚨" idx={1} delta={criticalCount > 0 ? `${criticalCount} critical` : undefined} deltaUp={false} />
-      <Card label="Unique Attackers" value={uniqueIPs.toLocaleString()} sub={`${successRate}% broke in successfully`} accent="var(--high)" icon="👤" idx={2} />
-      <Card label="Top Attack" value={topType} sub={`${stats?.by_attack_type[0]?.count ?? 0} attempts`} accent="var(--low)" icon="🎯" idx={3} />
+      <Card label="Total Events" value={totalEvents.toLocaleString()} sub={`${stats?.by_event_type.length ?? 0} attack types seen`} accent="var(--amber)" icon={<Zap size={18} />} idx={0} spark={spark} />
+      <Card label="Critical / High" value={`${criticalCount} / ${highCount}`} sub="by severity level" accent="var(--crit)" icon={<AlertTriangle size={18} />} idx={1} delta={criticalCount > 0 ? `${criticalCount} critical` : undefined} deltaUp={false} />
+      <Card label="Unique Attackers" value={uniqueIPs.toLocaleString()} sub={`${successRate}% broke in successfully`} accent="var(--high)" icon={<Users size={18} />} idx={2} />
+      <Card label="Top Attack" value={topType} sub={`${stats?.by_attack_type[0]?.count ?? 0} attempts`} accent="var(--low)" icon={<Target size={18} />} idx={3} />
     </div>
   )
 }

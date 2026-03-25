@@ -1,12 +1,14 @@
+import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { Zap, Brain, Search, Activity, ShieldCheck, Database, Cpu } from 'lucide-react'
 import { getHealth } from '../api/clients'
 import type { HealthStatus } from '../types'
 
 const NAV = [
-        { path: '/dashboard', emoji: '⚡', label: 'Live Dashboard', sub: 'Real-time feed' },
-        { path: '/intel', emoji: '🧠', label: 'Threat Intel', sub: 'Deep analysis' },
-        { path: '/ip', emoji: '🔍', label: 'IP Inspector', sub: 'Lookup any IP' },
+        { path: '/dashboard', icon: <Zap size={16} />, label: 'Live Dashboard', sub: 'Real-time feed' },
+        { path: '/intel', icon: <Brain size={16} />, label: 'Threat Intel', sub: 'Deep analysis' },
+        { path: '/ip', icon: <Search size={16} />, label: 'IP Inspector', sub: 'Lookup any IP' },
 ]
 
 interface Props {
@@ -21,7 +23,6 @@ export function AppShell({ children, connected = false, totalAttacks = 0, newCou
         const location = useLocation()
         const [health, setHealth] = useState<HealthStatus | null>(null)
         const [now, setNow] = useState(new Date())
-        const [collapsed, setColl] = useState(false)
 
         useEffect(() => {
                 getHealth().then(setHealth).catch(() => { })
@@ -37,12 +38,12 @@ export function AppShell({ children, connected = false, totalAttacks = 0, newCou
         const mlOk = health?.ml_models.loaded ?? false
 
         return (
-                <div className="app-shell" style={{ position: 'relative', zIndex: 1 }}>
+                <div className="app-shell">
 
                         {/* ── Topbar ── */}
                         <header className="topbar">
                                 <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'none', border: 'none', cursor: 'pointer', padding: 0, flexShrink: 0 }}>
-                                        <img src="/honeycloud.png" style={{ width: 34, height: 34, objectFit: 'contain' }} alt="HoneyCloud Logo" />
+                                        <img src="/honeycloud.png" style={{ width: 34, height: 34, objectFit: 'contain' }} alt="HC" />
                                         <div style={{ textAlign: 'left' }}>
                                                 <div style={{ fontFamily: 'var(--serif)', fontSize: 18, color: 'var(--char)', lineHeight: 1.1, fontWeight: 600 }}>HoneyCloud</div>
                                                 <div className="label" style={{ fontSize: 7, marginTop: 1 }}>Threat Intelligence</div>
@@ -56,66 +57,109 @@ export function AppShell({ children, connected = false, totalAttacks = 0, newCou
                                                         +{newCount} new
                                                 </span>
                                         )}
-                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--char5)' }}>
-                                                {totalAttacks.toLocaleString()} events captured
-                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <Activity size={12} style={{ color: 'var(--char6)' }} />
+                                                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--char5)', letterSpacing: '0.02em' }}>
+                                                        {totalAttacks.toLocaleString()} <span style={{ opacity: 0.6 }}>events captured</span>
+                                                </span>
+                                        </div>
                                 </div>
 
                                 {/* Right */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-                                        {[
-                                                { label: 'DB', on: dbOk },
-                                                { label: 'ML', on: mlOk },
-                                                { label: connected ? 'LIVE' : 'OFFLINE', on: connected },
-                                        ].map(s => (
-                                                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.on ? (s.label === (connected ? 'LIVE' : 'OFFLINE') ? 'var(--amber)' : 'var(--low)') : 'var(--crit)', display: 'inline-block', animation: s.on && s.label === (connected ? 'LIVE' : 'OFFLINE') ? 'ring-p 2s ease-in-out infinite' : 'none' }} />
-                                                        <span className="label" style={{ fontSize: 8 }}>{s.label}</span>
-                                                </div>
-                                        ))}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                                        <div style={{ display: 'flex', gap: 12 }}>
+                                                {[
+                                                        { label: 'DB', on: dbOk },
+                                                        { label: 'ML', on: mlOk },
+                                                        { label: connected ? 'LIVE' : 'OFFLINE', on: connected },
+                                                ].map(s => (
+                                                        <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.on ? (s.label === (connected ? 'LIVE' : 'OFFLINE') ? 'var(--amber)' : 'var(--low)') : 'var(--crit)', display: 'inline-block', animation: s.on && s.label === (connected ? 'LIVE' : 'OFFLINE') ? 'ring-p 2s ease-in-out infinite' : 'none' }} />
+                                                                <span className="label" style={{ fontSize: 8 }}>{s.label}</span>
+                                                        </div>
+                                                ))}
+                                        </div>
                                         <div style={{ width: 1, height: 16, background: 'var(--bdr)' }} />
-                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char5)' }}>
-                                                {now.toUTCString().slice(17, 25)} UTC
+                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--char5)', fontWeight: 500 }}>
+                                                {now.toUTCString().slice(17, 25)} <span style={{ opacity: 0.6 }}>UTC</span>
                                         </span>
                                 </div>
                         </header>
 
                         {/* ── Sidebar ── */}
                         <aside className="sidebar">
-                                <div className="nav-section-label">Navigation</div>
-
-                                <nav style={{ flex: 1 }}>
-                                        {NAV.map(item => {
-                                                const active = location.pathname === item.path || (item.path === '/ip' && location.pathname.startsWith('/ip'))
-                                                return (
-                                                        <button key={item.path} onClick={() => navigate(item.path)} className={`nav-item${active ? ' active' : ''}`}>
-                                                                <div className="nav-icon">{item.emoji}</div>
-                                                                <div style={{ minWidth: 0 }}>
-                                                                        <div style={{ fontSize: 13 }}>{item.label}</div>
-                                                                        <div style={{ fontFamily: 'var(--mono)', fontSize: 8, color: active ? 'var(--amber)' : 'var(--char6)', marginTop: 1, letterSpacing: '.06em' }}>{item.sub}</div>
-                                                                </div>
-                                                                {active && <div className="live-dot amber" style={{ marginLeft: 'auto', width: 5, height: 5 }} />}
-                                                        </button>
-                                                )
-                                        })}
-                                </nav>
+                                <div style={{ flex: 1 }}>
+                                        <div className="nav-section-label">Main Navigation</div>
+                                        <nav style={{ padding: '0 8px' }}>
+                                                {NAV.map(item => {
+                                                        const active = location.pathname === item.path || (item.path === '/ip' && location.pathname.startsWith('/ip'))
+                                                        return (
+                                                                <button
+                                                                        key={item.path}
+                                                                        onClick={() => navigate(item.path)}
+                                                                        className={`nav-item ${active ? 'active' : ''}`}
+                                                                        style={{ borderRadius: 8, marginBottom: 4 }}
+                                                                >
+                                                                        <div className="nav-icon" style={{
+                                                                                color: active ? 'var(--amber)' : 'var(--char5)',
+                                                                                background: active ? 'var(--amber-p)' : 'var(--cream-2)',
+                                                                                borderRadius: 8
+                                                                        }}>
+                                                                                {item.icon}
+                                                                        </div>
+                                                                        <div style={{ minWidth: 0 }}>
+                                                                                <div style={{ fontSize: 13, fontWeight: active ? 600 : 500 }}>{item.label}</div>
+                                                                                <div style={{ fontFamily: 'var(--mono)', fontSize: 8, color: active ? 'var(--amber)' : 'var(--char6)', marginTop: 1, letterSpacing: '.06em', textTransform: 'uppercase' }}>{item.sub}</div>
+                                                                        </div>
+                                                                        {active && <div className="live-dot amber" style={{ marginLeft: 'auto', width: 4, height: 4 }} />}
+                                                                </button>
+                                                        )
+                                                })}
+                                        </nav>
+                                </div>
 
                                 {/* System status card */}
-                                <div style={{ margin: '0 12px 16px', padding: 16, background: 'var(--surf2)', border: '1px solid var(--bdr)', borderRadius: 10 }}>
-                                        <div className="label" style={{ marginBottom: 12, fontSize: 8 }}>System Status</div>
-                                        {[
-                                                { label: 'Cowrie SSH Honeypot', on: true },
-                                                { label: 'Isolation Forest', on: mlOk },
-                                                { label: 'Bi-LSTM Model', on: mlOk },
-                                                { label: 'PostgreSQL DB', on: dbOk },
-                                        ].map(s => (
-                                                <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--char4)' }}>{s.label}</span>
-                                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 8, padding: '1px 6px', borderRadius: 3, background: s.on ? 'var(--low-bg)' : 'var(--cream-3)', color: s.on ? 'var(--low)' : 'var(--char6)', border: `1px solid ${s.on ? 'var(--low-b)' : 'var(--bdr)'}` }}>
-                                                                {s.on ? 'ONLINE' : 'OFFLINE'}
+                                <div style={{ padding: '20px 16px' }}>
+                                        <div style={{ padding: '16px', background: 'var(--surf2)', border: '1px solid var(--bdr)', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                                                        <ShieldCheck size={14} style={{ color: 'var(--amber)' }} />
+                                                        <span className="label" style={{ fontSize: 8, letterSpacing: '0.1em' }}>System Health</span>
+                                                </div>
+
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                        {[
+                                                                { label: 'Honeypots', on: true, icon: <Activity size={10} /> },
+                                                                { label: 'AI Models', on: mlOk, icon: <Cpu size={10} /> },
+                                                                { label: 'Database', on: dbOk, icon: <Database size={10} /> },
+                                                        ].map(s => (
+                                                                <div key={s.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                                <span style={{ color: 'var(--char6)' }}>{s.icon}</span>
+                                                                                <span style={{ fontFamily: 'var(--sans)', fontSize: 11, fontWeight: 500, color: 'var(--char4)' }}>{s.label}</span>
+                                                                        </div>
+                                                                        <span style={{
+                                                                                fontFamily: 'var(--mono)',
+                                                                                fontSize: 7,
+                                                                                padding: '1px 5px',
+                                                                                borderRadius: 4,
+                                                                                background: s.on ? 'var(--low-bg)' : 'var(--crit-bg)',
+                                                                                color: s.on ? 'var(--low)' : 'var(--crit)',
+                                                                                border: `1px solid ${s.on ? 'var(--low-b)' : 'var(--crit-b)'}`,
+                                                                                fontWeight: 600
+                                                                        }}>
+                                                                                {s.on ? 'ONLINE' : 'OFFLINE'}
+                                                                        </span>
+                                                                </div>
+                                                        ))}
+                                                </div>
+
+                                                <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--bdr)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                        <div style={{ width: 4, height: 4, borderRadius: '50%', background: connected ? 'var(--low)' : 'var(--crit)' }} />
+                                                        <span style={{ fontFamily: 'var(--mono)', fontSize: 8, color: 'var(--char6)' }}>
+                                                                Honeynet Connection: {connected ? 'Encrypted' : 'Lost'}
                                                         </span>
                                                 </div>
-                                        ))}
+                                        </div>
                                 </div>
                         </aside>
 

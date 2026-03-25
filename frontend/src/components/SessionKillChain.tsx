@@ -1,19 +1,22 @@
 import { useEffect, useState, useRef } from 'react'
+import { Link as LinkIcon, ShieldOff, Unlock, Terminal, LogOut } from 'lucide-react'
 import { getSessions, getSessionDetail } from '../api/clients'
 import type { Session, SessionDetail } from '../types'
 
 const CHAIN = [
-  { stage: 'connect', label: 'First Contact', tactic: 'Recon', color: '#2563EB', emoji: '🔌' },
-  { stage: 'login_failed', label: 'Trying Passwords', tactic: 'Brute Force', color: '#D97706', emoji: '🚫' },
-  { stage: 'login_success', label: 'Got In', tactic: 'Cred Access', color: '#DC2626', emoji: '🔓' },
-  { stage: 'command', label: 'Running Commands', tactic: 'Execution', color: '#991B1B', emoji: '💻' },
-  { stage: 'disconnect', label: 'Left', tactic: 'Exfiltration', color: '#6B7280', emoji: '👋' },
+  { stage: 'connect', label: 'First Contact', tactic: 'Recon', color: '#2563EB', icon: <LinkIcon size={14} /> },
+  { stage: 'login_failed', label: 'Trying Passwords', tactic: 'Brute Force', color: '#D97706', icon: <ShieldOff size={14} /> },
+  { stage: 'login_success', label: 'Got In', tactic: 'Cred Access', color: '#DC2626', icon: <Unlock size={14} /> },
+  { stage: 'command', label: 'Running Commands', tactic: 'Execution', color: '#991B1B', icon: <Terminal size={14} /> },
+  { stage: 'disconnect', label: 'Left', tactic: 'Exfiltration', color: '#6B7280', icon: <LogOut size={14} /> },
 ]
 
 const BADGE_CLS: Record<string, string> = { connect: 'chip chip-low', login_failed: 'chip chip-medium', login_success: 'chip chip-high', command: 'chip chip-critical', disconnect: 'chip' }
 
 function fmt(ts: string) { return new Date(ts).toUTCString().slice(17, 25) }
-function dur(s: number | null) { if (!s) return '—'; return s < 60 ? `${s.toFixed(0)}s` : `${(s / 60).toFixed(1)}m` }
+function dur(s: number | null) {
+  if (!s) return '—'; return s < 60 ? `${s.toFixed(0)}s` : `${(s / 60).toFixed(1)}m`
+}
 function asArr<T>(v: unknown): T[] { if (Array.isArray(v)) return v as T[]; if (typeof v === 'string') { try { const p = JSON.parse(v); if (Array.isArray(p)) return p as T[] } catch { } } return [] }
 
 export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }) {
@@ -27,14 +30,14 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
   // 1. Fetch sessions list (Refreshes on new attacks OR selection change)
   useEffect(() => {
     let active = true
-    const fetchS = () => getSessions(20).then(r => { 
+    const fetchS = () => getSessions(20).then(r => {
       if (!active) return
       setS(r.sessions)
       // Auto-select first session ONLY if nothing is selected
       if (r.sessions.length > 0 && !sel) setSel(r.sessions[0].session_id)
-      setL(false) 
+      setL(false)
     }).catch(() => { if (active) setL(false) })
-    
+
     fetchS()
     const t = setInterval(fetchS, 10000) // Poll list every 10s
     return () => { active = false; clearInterval(t) }
@@ -45,16 +48,16 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
     if (!sel) return
     let active = true
     const isNew = sel !== lastSel.current
-    
+
     if (isNew) {
       setDL(true)
       setD(null)
       lastSel.current = sel
     }
-    
+
     const fetchD = () => getSessionDetail(sel).then(data => {
       if (active) setD(data)
-    }).catch(() => {}).finally(() => {
+    }).catch(() => { }).finally(() => {
       if (active) setDL(false)
     })
 
@@ -128,8 +131,8 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
                       return (
                         <div key={kc.stage} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-                            <div className={`kc-node${active ? ' hit' : ''}`} style={{ background: active ? kc.color : 'var(--cream-2)', color: active ? kc.color : 'var(--char6)', border: `2px solid ${active ? kc.color : 'var(--bdr2)'}`, boxShadow: active ? `0 0 0 4px ${kc.color}22` : 'none' }}>
-                              {active && <div style={{ width: 11, height: 11, borderRadius: '50%', background: 'rgba(255,255,255,.75)' }} />}
+                            <div className={`kc-node${active ? ' hit' : ''}`} style={{ background: active ? kc.color : 'var(--cream-2)', color: active ? 'white' : 'var(--char6)', border: `2px solid ${active ? kc.color : 'var(--bdr2)'}`, boxShadow: active ? `0 0 0 4px ${kc.color}22` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {active ? kc.icon : <div style={{ width: 11, height: 11, borderRadius: '50%', background: 'var(--bdr)' }} />}
                             </div>
                             <div style={{ fontFamily: 'var(--sans)', fontSize: 9, color: active ? kc.color : 'var(--char6)', textAlign: 'center', lineHeight: 1.3, marginTop: 6, fontWeight: active ? 600 : 400 }}>{kc.label}</div>
                             <div className="label" style={{ fontSize: 6, color: 'var(--char6)', marginTop: 2, opacity: .6 }}>{kc.tactic}</div>

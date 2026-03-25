@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
+import { Box, Brain, Zap, Globe, Link as LinkIcon, BarChart3, ArrowRight } from 'lucide-react'
 
 const TAGLINES = ['Every attacker leaves a trace.', 'Decoy. Detect. Destroy.', 'The trap is already set.', 'See threats before they see you.']
 
@@ -22,12 +23,12 @@ const HOW = [
 ]
 
 const FEATURES = [
-        { icon: '🍯', title: 'Realistic Decoys', desc: 'SSH servers, web apps and databases that behave like the real thing — sophisticated attackers can\'t tell they\'re fake.' },
-        { icon: '🤖', title: 'AI Threat Scoring', desc: 'Every attack is automatically scored using three different AI models. No manual analysis required.' },
-        { icon: '🎯', title: 'Attack Prediction', desc: 'Our Bi-LSTM model learns attacker patterns and tells you what they\'ll try next — before they do it.' },
-        { icon: '🗺️', title: 'Global Attack Map', desc: 'See exactly where attacks are coming from on a live world map. Updated every minute.' },
-        { icon: '🔗', title: 'Kill Chain Tracking', desc: 'Follow every step of an attack from first contact to final action — visualised as a clear timeline.' },
-        { icon: '📊', title: 'Intelligence Reports', desc: 'Every attacker IP gets a full dossier — their behaviour, risk score, and recommended response.' },
+        { icon: <Box size={32} />, title: 'Realistic Decoys', desc: 'SSH servers, web apps and databases that behave like the real thing — sophisticated attackers can\'t tell they\'re fake.' },
+        { icon: <Brain size={32} />, title: 'AI Threat Scoring', desc: 'Every attack is automatically scored using three different AI models. No manual analysis required.' },
+        { icon: <Zap size={32} />, title: 'Attack Prediction', desc: 'Our Bi-LSTM model learns attacker patterns and tells you what they\'ll try next — before they do it.' },
+        { icon: <Globe size={32} />, title: 'Global Attack Map', desc: 'See exactly where attacks are coming from on a live world map. Updated every minute.' },
+        { icon: <LinkIcon size={32} />, title: 'Kill Chain Tracking', desc: 'Follow every step of an attack from first contact to final action — visualised as a clear timeline.' },
+        { icon: <BarChart3 size={32} />, title: 'Intelligence Reports', desc: 'Every attacker IP gets a full dossier — their behaviour, risk score, and recommended response.' },
 ]
 
 const STATS = [
@@ -139,7 +140,7 @@ export function Landing() {
                                         </div>
                                         <div style={{ display: 'flex', gap: 10 }}>
                                                 <button className="btn-outline" onClick={() => navigate('/dashboard')} style={{ padding: '8px 24px', fontSize: 13, borderColor: 'var(--bdr2)', color: 'var(--char)' }}>Dashboard</button>
-                                                <button className="btn-amber" onClick={() => navigate('/ip')} style={{ padding: '8px 24px', fontSize: 13 }}>Score an IP →</button>
+                                                <button className="btn-amber" onClick={() => navigate('/ip')} style={{ padding: '8px 24px', fontSize: 13 }}>Score an IP <ArrowRight size={14} style={{ marginLeft: 4, display: 'inline' }} /></button>
                                         </div>
                                 </nav>
 
@@ -178,7 +179,7 @@ export function Landing() {
 
                                                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                                                                 <button className="btn-amber" onClick={() => navigate('/dashboard')} style={{ padding: '14px 32px', fontSize: 14 }}>
-                                                                        See the Live Dashboard →
+                                                                        See the Live Dashboard <ArrowRight size={16} style={{ marginLeft: 6, display: 'inline' }} />
                                                                 </button>
                                                                 <button className="btn-outline" onClick={() => navigate('/ip')} style={{ padding: '13px 24px', fontSize: 14, borderColor: 'var(--bdr2)', color: 'var(--char)' }}>
                                                                         Check Any IP Address
@@ -304,17 +305,18 @@ export function Landing() {
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
                                                         {FEATURES.map((f, i) => (
                                                                 <div key={f.title} className="feature-card" style={{ animationDelay: `${i * .06}s`, background: 'var(--surf)', border: '1px solid var(--bdr)' }}>
-                                                                        <div style={{ fontSize: 32, marginBottom: 20 }}>{f.icon}</div>
+                                                                        <div style={{ color: 'var(--amber)', marginBottom: 20 }}>{f.icon}</div>
                                                                         <div style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--char)', marginBottom: 12, lineHeight: 1.3, fontWeight: 600 }}>{f.title}</div>
                                                                         <div style={{ fontFamily: 'var(--sans)', fontSize: 14, color: 'var(--char4)', lineHeight: 1.7, fontWeight: 400 }}>{f.desc}</div>
                                                                 </div>
                                                         ))}
                                                 </div>
                                         </div>
-                                </section>
+                                </section >
 
                                 {/* ── WHO IS IT FOR ── */}
-                                <section style={{ padding: '100px 48px', background: 'var(--surf2)', borderTop: '1px solid var(--bdr)' }}>
+                                < section style={{ padding: '100px 48px', background: 'var(--surf2)', borderTop: '1px solid var(--bdr)' }
+                                }>
                                         <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
                                                 <div>
                                                         <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: '.2em', textTransform: 'uppercase', marginBottom: 20 }}>Who It's For</div>
@@ -342,10 +344,10 @@ export function Landing() {
                                                         ))}
                                                 </div>
                                         </div>
-                                </section>
+                                </section >
 
                                 {/* ── CTA ── */}
-                                <section style={{ padding: '140px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                                < section style={{ padding: '140px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
                                         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 400, background: 'radial-gradient(ellipse, rgba(232,150,12,.1) 0%, transparent 65%)', pointerEvents: 'none' }} />
                                         <div style={{ position: 'relative', zIndex: 1, maxWidth: 640, margin: '0 auto' }}>
                                                 <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--amber)', fontWeight: 600, letterSpacing: '.2em', textTransform: 'uppercase', marginBottom: 24 }}>Get Started Now</div>
@@ -357,21 +359,21 @@ export function Landing() {
                                                         Attackers are probing your network right now. Find out who they are — and stop them in their tracks.
                                                 </p>
                                                 <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
-                                                        <button className="btn-amber" onClick={() => navigate('/dashboard')} style={{ padding: '16px 48px', fontSize: 15 }}>Enter the Dashboard →</button>
+                                                        <button className="btn-amber" onClick={() => navigate('/dashboard')} style={{ padding: '16px 48px', fontSize: 15 }}>Enter the Dashboard <ArrowRight size={18} style={{ marginLeft: 8, display: 'inline' }} /></button>
                                                         <button className="btn-outline" onClick={() => navigate('/ip')} style={{ padding: '15px 36px', fontSize: 15, borderColor: 'var(--bdr2)', color: 'var(--char)' }}>Look Up an IP</button>
                                                 </div>
                                         </div>
-                                </section>
+                                </section >
 
                                 {/* ── Footer ── */}
-                                <footer style={{ borderTop: '1px solid var(--bdr)', padding: '32px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24, background: 'var(--surf)' }}>
+                                < footer style={{ borderTop: '1px solid var(--bdr)', padding: '32px 48px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 24, background: 'var(--surf)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                                                 <img src="/honeycloud.png" style={{ width: 28, height: 28, objectFit: 'contain' }} alt="Logo" />
                                                 <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--char5)', fontWeight: 500 }}>HoneyCloud — MIT License</span>
                                         </div>
                                         <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--char5)', opacity: .7 }}>Powered by Cowrie · Isolation Forest · XGBoost · Bi-LSTM · MITRE ATT&CK</span>
-                                </footer>
-                        </div>
+                                </footer >
+                        </div >
                 </>
         )
 }

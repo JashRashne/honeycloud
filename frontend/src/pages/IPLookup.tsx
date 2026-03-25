@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { AlertCircle, ArrowRight, Search } from 'lucide-react'
 import { AppShell } from '../components/AppShell'
 import { scoreIP } from '../api/clients'
 import type { ScoreResult } from '../types'
@@ -38,7 +39,7 @@ export function IPLookup() {
     finally { clearInterval(sid); setL(false); setStep(0) }
   }
 
-  useState(() => { if (routeIP) lookup(routeIP) })
+  useEffect(() => { if (routeIP) lookup(routeIP) }, [routeIP])
 
   const sColor = result ? SEV_COL[result.threat_level] : 'var(--amber)'
   const sBg = result ? SEV_BG[result.threat_level] : 'transparent'
@@ -46,7 +47,7 @@ export function IPLookup() {
 
   return (
     <AppShell>
-      <div className="page-body" style={{ maxWidth: 960 }}>
+      <div className="page-body">
 
         {/* Page header */}
         <div style={{ borderBottom: '1px solid var(--bdr)', paddingBottom: 16 }}>
@@ -63,20 +64,24 @@ export function IPLookup() {
         <div className="panel au" style={{ padding: 22 }}>
           <div className="label" style={{ marginBottom: 10, fontSize: 8 }}>Enter an IP address to investigate</div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <input
-              className="hc-input"
-              type="text" value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && lookup()}
-              placeholder="e.g. 45.33.32.156"
-            />
-            <button className="btn-primary" onClick={() => lookup()} disabled={loading || !input.trim()} style={{ whiteSpace: 'nowrap', minWidth: 130 }}>
-              {loading ? 'Analysing…' : 'Investigate →'}
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={14} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--char6)' }} />
+              <input
+                className="hc-input"
+                style={{ paddingLeft: 38 }}
+                type="text" value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && lookup()}
+                placeholder="e.g. 45.33.32.156"
+              />
+            </div>
+            <button className="btn-amber" onClick={() => lookup()} disabled={loading || !input.trim()} style={{ whiteSpace: 'nowrap', minWidth: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {loading ? 'Analysing…' : <>{'Investigate'} <ArrowRight size={14} /></>}
             </button>
           </div>
           {error && (
             <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--crit)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-              ⚠ {error}
+              <AlertCircle size={12} /> {error}
             </div>
           )}
         </div>
@@ -110,7 +115,7 @@ export function IPLookup() {
                   <div style={{ fontFamily: 'var(--mono)', fontSize: 30, fontWeight: 500, color: 'var(--char)', letterSpacing: '.02em', lineHeight: 1 }}>{result.ip}</div>
                   {result.intel_match && (
                     <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--crit)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      ⚠ {result.intel_match.note} [{result.intel_match.country}]
+                      <AlertCircle size={12} /> {result.intel_match.note} [{result.intel_match.country}]
                     </div>
                   )}
                 </div>
