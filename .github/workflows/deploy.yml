@@ -25,11 +25,6 @@ jobs:
           key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
           script: |
             cd ~/honeycloud
-
-            # --- GITOPS FIX: Clean up Docker's fake folder ---
-            sudo docker compose down cowrie
-            sudo rm -rf cowrie/cowrie.cfg
-            #-----------------------------------
             git pull origin main
             sudo docker compose up --build -d
             sudo docker image prune -a -f

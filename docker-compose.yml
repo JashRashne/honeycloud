@@ -24,8 +24,8 @@ services:
     ports:  
       - "2222:2222"
     volumes:
-      - cowrie-logs:/cowrie/var/log/cowrie
-      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/cowrie.cfg:ro
       - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
