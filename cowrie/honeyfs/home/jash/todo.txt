@@ -1,0 +1,3 @@
+- Fix the nginx config on the staging server
+- Update the postgres password (currently: HoneyCloud2026!)
+- Backup the /var/www/html folder

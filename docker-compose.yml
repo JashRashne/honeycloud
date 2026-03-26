@@ -25,6 +25,7 @@ services:
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
+      - ./cowrie/honeyfs:/cowrie/share/cowrie/honeyfs  # Add this line
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
     environment:
       - COWRIE_TELNET_ENABLED=no

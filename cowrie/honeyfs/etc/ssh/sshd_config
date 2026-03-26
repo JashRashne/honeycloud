@@ -1,0 +1,41 @@
+# Standard OpenSSH Server Configuration
+# Ubuntu 22.04 LTS default setup
+
+Include /etc/ssh/sshd_config.d/*.conf
+
+Port 22
+Protocol 2
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
+
+# Authentication:
+LoginGraceTime 2m
+PermitRootLogin yes
+StrictModes yes
+MaxAuthTries 6
+MaxSessions 10
+
+PubkeyAuthentication yes
+
+PasswordAuthentication yes
+PermitEmptyPasswords no
+
+# GSSAPI options
+GSSAPIAuthentication no
+
+
+X11Forwarding yes
+PrintMotd no
+AcceptEnv LANG LC_*
+
+# Allow client to keep connection alive
+ClientAliveInterval 300
+ClientAliveCountMax 3
+
+# Use the standard sftp subsystem
+Subsystem sftp /usr/lib/openssh/sftp-server
