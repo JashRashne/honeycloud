@@ -47,9 +47,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*", "ngrok-skip-browser-warning"], # Explicitly allow the bypass header
 )
+
+
+
+# HELPER: This ensures that even if Ngrok sends a weird header, 
+# FastAPI handles the WebSocket handshake correctly.
+@app.middleware("http")
+async def add_ngrok_skip_header(request, call_next):
+    response = await call_next(request)
+    response.headers["ngrok-skip-browser-warning"] = "true"
+    return response
 
 
 # ═══════════════════════════════════════════════════════════════
