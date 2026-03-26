@@ -30,6 +30,8 @@ services:
       - ./cowrie/honeyfs/etc/issue:/cowrie/cowrie-git/honeyfs/etc/issue:ro
       - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
     environment:
+      - COWRIE_OUTPUT_JSON_ENABLED=yes  # <--- THIS IS THE KEY!
+      - COWRIE_LOG_JSON_FILE=/cowrie/var/log/cowrie/cowrie.json
       - COWRIE_TELNET_ENABLED=no
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
       - COWRIE_HONEYPOT_KERNEL_VERSION=5.15.0-101-generic
