@@ -24,7 +24,7 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      - cowrie-logs:/home/cowrie/cowrie-git/var/log/cowrie # <--- THIS is the official internal path
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie # <--- THIS is the official internal path
       - ./cowrie/honeyfs/etc/motd:/cowrie/cowrie-git/honeyfs/etc/motd:ro
       - ./cowrie/honeyfs/etc/hosts:/cowrie/cowrie-git/honeyfs/etc/hosts:ro
       - ./cowrie/honeyfs/etc/issue:/cowrie/cowrie-git/honeyfs/etc/issue:ro
