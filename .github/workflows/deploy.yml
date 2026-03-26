@@ -4,7 +4,14 @@ on:
   push:
     branches:
       - main
-
+    paths:
+      - 'honeycloud/**'      # Only trigger if backend code changes
+      - 'docker-compose.yml' # Only trigger if docker config changes
+      - 'requirements.txt'   # Only trigger if dependencies change
+      - '.github/workflows/deploy.yml'
+      - 'api/**'
+      - 'layer2/**'
+      - 'cowrie/**'
 jobs:
   deploy:
     runs-on: ubuntu-latest
