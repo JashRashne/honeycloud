@@ -14,7 +14,6 @@ services:
              chmod 666 /logs/cowrie.json"
 
   # ── Cowrie SSH Honeypot ─────────────────────────────────────
-
   cowrie:
     image: cowrie/cowrie:latest
     container_name: honeycloud-cowrie
@@ -26,17 +25,18 @@ services:
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
-      # Overwrite existing Cowrie map files with our disguises!
+      # Disguise & Bait Mappings
       - ./cowrie/honeyfs/etc/motd:/cowrie/cowrie-git/honeyfs/etc/motd:ro
       - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
+      - ./cowrie/honeyfs/root/.bash_history:/cowrie/cowrie-git/honeyfs/root/.bash_history:ro
+      - ./cowrie/honeyfs/root/.ssh/id_rsa:/cowrie/cowrie-git/honeyfs/root/.ssh/id_rsa:ro
+      - ./cowrie/honeyfs/root/.aws/credentials:/cowrie/cowrie-git/honeyfs/root/.aws/credentials:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
       - COWRIE_HONEYPOT_KERNEL_VERSION=5.15.0-101-generic
-      # Fixed the variable name here!
       - "COWRIE_HONEYPOT_KERNEL_BUILD_STRING=#1 SMP Tue Feb 11 19:10:02 UTC 2026"
       - "COWRIE_SSH_VERSION=SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
-  
   # ── Collector ───────────────────────────────────────────────
   collector:
     build: .
