@@ -26,17 +26,16 @@ services:
     volumes:
       # Keep your logs working exactly as they were
       - cowrie-logs:/cowrie/var/log/cowrie
-      # Mount honeyfs to a safe, isolated path so it doesn't break Python
-      - ./cowrie/honeyfs:/custom_honeyfs:ro
+      # Inject ONLY our custom bait files into the default filesystem
+      - ./cowrie/honeyfs/var/www/html/.env:/cowrie/cowrie-git/honeyfs/var/www/html/.env:ro
+      - ./cowrie/honeyfs/etc/ssh/sshd_config:/cowrie/cowrie-git/honeyfs/etc/ssh/sshd_config:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
-      # Set the identity variables directly!
+      # Set the identity variables directly! (Removed CONTENTS_PATH)
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
-      - COWRIE_HONEYPOT_CONTENTS_PATH=/custom_honeyfs
       - COWRIE_HONEYPOT_KERNEL_VERSION=5.15.0-101-generic
       - "COWRIE_HONEYPOT_KERNEL_BUILD_DATE=SMP Tue Feb 11 19:10:02 UTC 2026"
       - "COWRIE_SSH_VERSION=SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
-
   # ── Collector ───────────────────────────────────────────────
   collector:
     build: .
