@@ -25,11 +25,11 @@ services:
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
+      # Mapping to Cowrie's internal honeyfs source
       - ./cowrie/honeyfs/etc/motd:/cowrie/cowrie-git/honeyfs/etc/motd:ro
-      # Overwrite /etc/hosts with internal IP bait
       - ./cowrie/honeyfs/etc/hosts:/cowrie/cowrie-git/honeyfs/etc/hosts:ro
-      # Overwrite /etc/issue with a fake "System Notice"
       - ./cowrie/honeyfs/etc/issue:/cowrie/cowrie-git/honeyfs/etc/issue:ro
+      - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
