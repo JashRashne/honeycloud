@@ -21,14 +21,21 @@ services:
     depends_on:
       cowrie-init:
         condition: service_completed_successfully
-    ports:  
+    ports:
       - "2222:2222"
     volumes:
-      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
-      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/cowrie.cfg:ro
-      - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
+      # Keep your logs working exactly as they were
+      - cowrie-logs:/cowrie/var/log/cowrie
+      # Mount honeyfs to a safe, isolated path so it doesn't break Python
+      - ./cowrie/honeyfs:/custom_honeyfs:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
+      # Set the identity variables directly!
+      - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
+      - COWRIE_HONEYPOT_CONTENTS_PATH=/custom_honeyfs
+      - COWRIE_HONEYPOT_KERNEL_VERSION=5.15.0-101-generic
+      - "COWRIE_HONEYPOT_KERNEL_BUILD_DATE=SMP Tue Feb 11 19:10:02 UTC 2026"
+      - "COWRIE_SSH_VERSION=SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
 
   # ── Collector ───────────────────────────────────────────────
   collector:
