@@ -72,3 +72,8 @@ services:
 volumes:
   cowrie-logs:
     name: honeycloud-cowrie-logs
+    driver: local
+    driver_opts:
+      type: 'none'
+      o: 'bind'
+      device: '/home/jash/honeycloud/cowrie/var/log/cowrie'
