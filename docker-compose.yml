@@ -26,11 +26,10 @@ services:
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
       - ./cowrie/honeyfs/etc/motd:/cowrie/cowrie-git/honeyfs/etc/motd:ro
-      - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
-      # Fix: Map directly to Cowrie's internal "root" home path
-      - ./cowrie/honeyfs/root/.bash_history:/cowrie/cowrie-git/honeyfs/home/cowrie/.bash_history:ro
-      - ./cowrie/honeyfs/root/.ssh/id_rsa:/cowrie/cowrie-git/honeyfs/home/cowrie/.ssh/id_rsa:ro
-      - ./cowrie/honeyfs/root/.aws/credentials:/cowrie/cowrie-git/honeyfs/home/cowrie/.aws/credentials:ro    
+      # Overwrite /etc/hosts with internal IP bait
+      - ./cowrie/honeyfs/etc/hosts:/cowrie/cowrie-git/honeyfs/etc/hosts:ro
+      # Overwrite /etc/issue with a fake "System Notice"
+      - ./cowrie/honeyfs/etc/issue:/cowrie/cowrie-git/honeyfs/etc/issue:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01

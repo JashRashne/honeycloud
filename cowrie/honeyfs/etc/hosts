@@ -1,0 +1,4 @@
+127.0.0.1       localhost
+136.112.225.237 prod-srv-01
+10.0.0.5        db-prod-internal  # DO NOT SSH WITHOUT VPN
+10.0.0.6        backup-server-01
