@@ -82,7 +82,7 @@ export function Landing() {
 
         // Page loader
         useEffect(() => {
-                const steps = [0, 1, 2, 3].map((i, _, a) =>
+                const steps = [0, 1, 2, 3].map((i, _) =>
                         setTimeout(() => setLStep(i), i * 480)
                 )
                 const done = setTimeout(() => {

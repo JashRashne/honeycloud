@@ -8,7 +8,7 @@ import type { ScoreResult } from '../types'
 const SEV_COL: Record<string, string> = { CRITICAL: 'var(--crit)', HIGH: 'var(--high)', MEDIUM: 'var(--med)', LOW: 'var(--low)' }
 const SEV_BG: Record<string, string> = { CRITICAL: 'var(--crit-bg)', HIGH: 'var(--high-bg)', MEDIUM: 'var(--med-bg)', LOW: 'var(--low-bg)' }
 const SEV_B: Record<string, string> = { CRITICAL: 'var(--crit-b)', HIGH: 'var(--high-b)', MEDIUM: 'var(--med-b)', LOW: 'var(--low-b)' }
-const SEV_CLS: Record<string, string> = { CRITICAL: 'chip chip-critical', HIGH: 'chip chip-high', MEDIUM: 'chip chip-medium', LOW: 'chip chip-low' }
+// const SEV_CLS: Record<string, string> = { CRITICAL: 'chip chip-critical', HIGH: 'chip chip-high', MEDIUM: 'chip chip-medium', LOW: 'chip chip-low' }
 
 function Bar({ value, color, h = 6 }: { value: number; color: string; h?: number }) {
   return (

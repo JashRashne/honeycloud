@@ -195,7 +195,7 @@ export function SessionKillChain({ refreshTrigger }: { refreshTrigger?: number }
                 <div>
                   <div className="label" style={{ marginBottom: 10, fontSize: 8 }}>Full event log</div>
                   <div className="vtl" style={{ maxHeight: 180, overflowY: 'auto' }}>
-                    {events.map((e, i) => {
+                    {events.map((e) => {
                       const kc = CHAIN.find(k => k.stage === e.event_type)
                       return (
                         <div key={e.id} className="vtl-item">
