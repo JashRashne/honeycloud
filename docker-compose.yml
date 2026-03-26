@@ -25,12 +25,12 @@ services:
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
-      # Disguise & Bait Mappings
       - ./cowrie/honeyfs/etc/motd:/cowrie/cowrie-git/honeyfs/etc/motd:ro
       - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
-      - ./cowrie/honeyfs/root/.bash_history:/cowrie/cowrie-git/honeyfs/root/.bash_history:ro
-      - ./cowrie/honeyfs/root/.ssh/id_rsa:/cowrie/cowrie-git/honeyfs/root/.ssh/id_rsa:ro
-      - ./cowrie/honeyfs/root/.aws/credentials:/cowrie/cowrie-git/honeyfs/root/.aws/credentials:ro
+      # Fix: Map directly to Cowrie's internal "root" home path
+      - ./cowrie/honeyfs/root/.bash_history:/cowrie/cowrie-git/honeyfs/home/cowrie/.bash_history:ro
+      - ./cowrie/honeyfs/root/.ssh/id_rsa:/cowrie/cowrie-git/honeyfs/home/cowrie/.ssh/id_rsa:ro
+      - ./cowrie/honeyfs/root/.aws/credentials:/cowrie/cowrie-git/honeyfs/home/cowrie/.aws/credentials:ro    
     environment:
       - COWRIE_TELNET_ENABLED=no
       - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
