@@ -76,4 +76,4 @@ volumes:
     driver_opts:
       type: 'none'
       o: 'bind'
-      device: '${PWD}/cowrie/var/log/cowrie'
+      device: '/home/jash/honeycloud/cowrie/var/log/cowrie'
