@@ -21,12 +21,12 @@ services:
     depends_on:
       cowrie-init:
         condition: service_completed_successfully
-    ports:
+    ports:  
       - "2222:2222"
     volumes:
       - cowrie-logs:/cowrie/var/log/cowrie
-      - ./cowrie/honeyfs:/cowrie/share/cowrie/honeyfs  # Add this line
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
     environment:
       - COWRIE_TELNET_ENABLED=no
 
