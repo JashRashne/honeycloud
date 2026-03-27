@@ -11,8 +11,8 @@ type GeoInfo = {
 
 const GEO_CACHE = new Map<string, GeoInfo>();
 
-const MAX_CONCURRENT = 15;
-const BATCH_DELAY = 600; // ms - keeps us safe on free tier
+const MAX_CONCURRENT = 5;
+const BATCH_DELAY = 1500; // ms - keeps us safe on free tier
 
 export function isPrivateIP(ip: string): boolean {
         if (ip === '127.0.0.1' || ip === '::1') return true;
