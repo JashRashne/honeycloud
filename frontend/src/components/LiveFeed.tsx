@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link as LinkIcon, ShieldOff, Unlock, Terminal } from 'lucide-react'
 import type { Attack, Severity } from '../types'
+import { getGeoInfo, isPrivateIP } from '../utils/geo';
 
 const SEV_CLS: Record<Severity, string> = {
   CRITICAL: 'chip chip-critical',
@@ -25,48 +26,6 @@ function timeAgo(ts: string) {
   return `${Math.floor(d / 3600)}h ago`
 }
 
-function isPrivateIP(ip: string): boolean {
-  if (ip === '127.0.0.1' || ip === '::1') return true
-  const p = ip.split('.').map(Number)
-  if (p.length !== 4 || p.some(isNaN)) return true
-  if (p[0] === 10) return true
-  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true
-  if (p[0] === 192 && p[1] === 168) return true
-  if (p[0] === 169 && p[1] === 254) return true
-  return false
-}
-
-// Simple cache to avoid re-fetching the same IPs frequently
-const geoCache = new Map<string, string>()
-
-async function getLocations(ips: string[]): Promise<Record<string, string>> {
-  const publicIPs = ips.filter(ip => !isPrivateIP(ip) && !geoCache.has(ip))
-  if (publicIPs.length === 0) return {}
-
-  try {
-    const res = await fetch('https://ip-api.com/batch?fields=status,city,country,query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(publicIPs),
-    })
-
-    const data: Array<{ status: string; city?: string; country?: string; query: string }> = await res.json()
-
-    const result: Record<string, string> = {}
-    data.forEach(item => {
-      if (item.status === 'success' && item.query) {
-        const loc = [item.city, item.country].filter(Boolean).join(', ')
-        const display = loc || 'Unknown'
-        result[item.query] = display
-        geoCache.set(item.query, display)
-      }
-    })
-    return result
-  } catch {
-    return {}
-  }
-}
-
 export function LiveFeed({ attacks }: { attacks: Attack[] }) {
   const navigate = useNavigate()
   const listRef = useRef<HTMLDivElement>(null)
@@ -75,13 +34,14 @@ export function LiveFeed({ attacks }: { attacks: Attack[] }) {
 
   // Fetch locations for new public IPs
   useEffect(() => {
-    const uniqueIPs = [...new Set(attacks.map(a => a.src_ip))]
-    getLocations(uniqueIPs).then(newLocs => {
+    const uniqueIPs = [...new Set(attacks.map(a => a.src_ip))];
+
+    getGeoInfo(uniqueIPs).then(({ locations: newLocs }) => {
       if (Object.keys(newLocs).length > 0) {
-        setLocations(prev => ({ ...prev, ...newLocs }))
+        setLocations(prev => ({ ...prev, ...newLocs }));
       }
-    })
-  }, [attacks])
+    });
+  }, [attacks]);
 
   // New attack highlight
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getTopIPs } from '../api/clients'
 import type { TopIP } from '../types'
+import { getGeoInfo, isPrivateIP } from '../utils/geo';
 
 // ── Severity ─────────────────────────────────────────────────
 const SEV_COLOR: Record<string, string> = {
@@ -19,37 +20,9 @@ function scoreToSev(s: number | null): string {
 }
 
 // ── Home = Kalyan, Maharashtra ────────────────────────────────
-const HOME_LAT = 19.2403
-const HOME_LNG = 73.1305
+const HOME_LAT = 41.2591
+const HOME_LNG = -95.8517
 
-function isPrivateIP(ip: string): boolean {
-  if (ip === '127.0.0.1' || ip === '::1') return true
-  const p = ip.split('.').map(Number)
-  if (p.length !== 4 || p.some(isNaN)) return true
-  if (p[0] === 10) return true
-  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return true
-  if (p[0] === 192 && p[1] === 168) return true
-  if (p[0] === 169 && p[1] === 254) return true
-  return false
-}
-
-interface GeoEntry { status: string; lat?: number; lon?: number; country?: string; city?: string; query: string }
-
-async function geolocateIPs(ips: string[]): Promise<Record<string, GeoEntry>> {
-  const pub = ips.filter(ip => !isPrivateIP(ip)).slice(0, 100)
-  if (!pub.length) return {}
-  try {
-    const res = await fetch('https://ip-api.com/batch?fields=status,lat,lon,country,city,query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pub.map(ip => ({ query: ip }))),
-    })
-    const data: GeoEntry[] = await res.json()
-    const out: Record<string, GeoEntry> = {}
-    data.forEach(e => { if (e.query) out[e.query] = e })
-    return out
-  } catch { return {} }
-}
 
 // ── Leaflet CDN loader ────────────────────────────────────────
 let lfPromise: Promise<void> | null = null
@@ -220,8 +193,8 @@ export function AttackMap() {
       const L = (window as any).L
 
       const map = L.map(containerRef.current, {
-        center: [20, 30],
-        zoom: 2.5,
+        center: [41.2591, -95.8517],
+        zoom: 3,
         zoomControl: true,
         scrollWheelZoom: true,
         attributionControl: true,
@@ -277,7 +250,8 @@ export function AttackMap() {
         const { top_ips } = await getTopIPs(50)
         if (cancelled || !top_ips.length) { setLoading(false); return }
 
-        const geoMap = await geolocateIPs(top_ips.map((ip: TopIP) => ip.src_ip))
+        const ipList = top_ips.map((ip: TopIP) => ip.src_ip);
+        const { geoMap } = await getGeoInfo(ipList);
         if (cancelled) return
 
         const L = (window as any).L
@@ -301,13 +275,13 @@ export function AttackMap() {
         sorted.forEach((ip: TopIP) => {
           if (isPrivateIP(ip.src_ip)) return
           const geo = geoMap[ip.src_ip]
-          if (!geo || geo.status !== 'success' || !geo.lat || !geo.lon) return
+          if (!geo || !geo.latitude || !geo.longitude) return
 
           const sev = scoreToSev(ip.max_anomaly_score)
           const col = SEV_COLOR[sev]
           const jit = () => (Math.random() - 0.5) * 0.09
-          const lat = geo.lat + jit()
-          const lng = geo.lon + jit()
+          const lat = geo.latitude + jit()
+          const lng = geo.longitude + jit()
 
           bounds.push([lat, lng])
 
@@ -319,7 +293,7 @@ export function AttackMap() {
             zIndexOffset: sev === 'CRITICAL' ? 900 : sev === 'HIGH' ? 600 : 0,
           })
 
-          const locationStr = [geo.city, geo.country].filter(Boolean).join(', ') || 'Unknown location'
+          const locationStr = [geo.city, geo.country_name].filter(Boolean).join(', ') || 'Unknown location'
 
           const popup = `
             <div style="padding:14px 16px;min-width:210px;color:#5F3718">
