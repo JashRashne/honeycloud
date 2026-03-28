@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Link as LinkIcon, ShieldOff, Unlock, Terminal } from 'lucide-react'
 import type { Attack, Severity } from '../types'
@@ -32,18 +32,23 @@ export function LiveFeed({ attacks }: { attacks: Attack[] }) {
   const prevLen = useRef(0)
   const [locations, setLocations] = useState<Record<string, string>>({})
 
+  // Limit to latest 50 attacks for performance (you can adjust)
+  const displayedAttacks = useMemo(() => {
+    return [...attacks].slice(0, 50) // Keep only the most recent 50 in memory
+  }, [attacks])
+
   // Fetch locations for new public IPs
   useEffect(() => {
-    const uniqueIPs = [...new Set(attacks.map(a => a.src_ip))];
+    const uniqueIPs = [...new Set(displayedAttacks.map(a => a.src_ip))]
 
     getGeoInfo(uniqueIPs).then(({ locations: newLocs }) => {
       if (Object.keys(newLocs).length > 0) {
-        setLocations(prev => ({ ...prev, ...newLocs }));
+        setLocations(prev => ({ ...prev, ...newLocs }))
       }
-    });
-  }, [attacks]);
+    })
+  }, [displayedAttacks])
 
-  // New attack highlight
+  // Highlight newest attack
   useEffect(() => {
     if (attacks.length > prevLen.current && listRef.current) {
       const first = listRef.current.firstElementChild as HTMLElement | null
@@ -56,12 +61,18 @@ export function LiveFeed({ attacks }: { attacks: Attack[] }) {
   }, [attacks])
 
   return (
-    <div className="panel" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="panel" style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%'
+    }}>
       <div className="panel-hd">
         <span className="label">LIVE ATTACK FEED</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className="live-dot" />
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--low)', letterSpacing: '.08em' }}>streaming</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--low)', letterSpacing: '.08em' }}>
+            streaming • {attacks.length} total
+          </span>
         </div>
       </div>
 
@@ -91,22 +102,39 @@ export function LiveFeed({ attacks }: { attacks: Attack[] }) {
         <div>WHEN</div>
       </div>
 
-      {/* Scrollable List */}
-      <div ref={listRef} style={{ flex: 1, overflowY: 'auto', background: 'var(--surf1)' }}>
-        {attacks.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '160px', gap: 12 }}>
+      {/* Scrollable List - FIXED HEIGHT + SCROLL */}
+      <div
+        ref={listRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          background: 'var(--surf1)',
+          minHeight: 0,                    // Important for flex scrolling
+          maxHeight: 'calc(10 * 52px)',    // ≈ 10 rows (adjust if your row height changes)
+        }}
+        className="custom-scroll"
+      >
+        {displayedAttacks.length === 0 ? (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '200px',
+            gap: 12
+          }}>
             <div className="spinner" />
             <span className="label" style={{ color: 'var(--char6)' }}>Waiting for attacks…</span>
           </div>
         ) : (
-          attacks.map((a) => {
+          displayedAttacks.map((a, index) => {
             const sev = (a.severity ?? 'LOW') as Severity
             const isLocal = isPrivateIP(a.src_ip)
             const location = isLocal ? 'Local Network' : (locations[a.src_ip] || 'Resolving…')
 
             return (
               <div
-                key={a.id}
+                key={a.id || index} // fallback to index if id is missing
                 className="row-hover feed-row"
                 style={{
                   display: 'grid',
@@ -115,6 +143,7 @@ export function LiveFeed({ attacks }: { attacks: Attack[] }) {
                   padding: '11px 20px',
                   alignItems: 'center',
                   borderBottom: '1px solid var(--bdr)',
+                  minHeight: '52px',           // Consistent row height
                 }}
               >
                 {/* Icon */}
