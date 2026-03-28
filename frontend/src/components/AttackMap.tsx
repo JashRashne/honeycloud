@@ -224,9 +224,6 @@ export function AttackMap() {
           <div style="padding:13px 16px;min-width:170px">
             <div style="font-family:JetBrains Mono;font-size:8px;font-weight:600;color:#FBC64C;letter-spacing:.2em;margin-bottom:7px">HONEYPOT NODE</div>
             <div style="font-family:JetBrains Mono;font-size:13px;color:#5F3718;font-weight:600">Council Bluffs, Iowa</div>
-            const HOME_LAT = 41.2591
-const HOME_LNG = -95.8517
-
             <div style="font-family:JetBrains Mono;font-size:9px;color:#73421A;margin-top:3px">United States · 41.2591° N, 95.8517° W</div>
             <div style="margin-top:9px;padding-top:9px;border-top:1px solid rgba(95,55,24,.18);font-family:JetBrains Mono;font-size:8px;color:#73421A">
               All attack arcs terminate here
