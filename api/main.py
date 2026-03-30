@@ -6,6 +6,9 @@ api/main.py
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -15,6 +18,7 @@ import asyncpg
 import httpx
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -451,6 +455,65 @@ async def session_detail(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/sessions/ip/{ip}")
+async def sessions_by_ip(ip: str, limit: int = Query(50, ge=1, le=500)):
+    """
+    Return sessions for one source IP with a step-by-step attack timeline per session.
+    """
+    try:
+        async with _pool().acquire() as conn:
+            sessions_rows = await conn.fetch(
+                """
+                SELECT id, session_id, src_ip, start_time, end_time,
+                       duration_sec, login_attempts, login_successes, commands_run,
+                       hassh, honeypot, created_at
+                FROM   sessions
+                WHERE  src_ip = $1
+                ORDER  BY start_time DESC
+                LIMIT  $2
+                """,
+                ip,
+                limit,
+            )
+
+            if not sessions_rows:
+                return {"ip": ip, "count": 0, "sessions": []}
+
+            session_ids = [r["session_id"] for r in sessions_rows]
+            attack_rows = await conn.fetch(
+                """
+                SELECT id, session_id, src_ip, event_type, username, password,
+                       command, timestamp, anomaly_score, severity, attack_type
+                FROM   attacks
+                WHERE  session_id = ANY($1::text[])
+                ORDER  BY session_id, timestamp, id
+                """,
+                session_ids,
+            )
+
+        steps_by_session: dict[str, list[dict]] = {sid: [] for sid in session_ids}
+        for row in attack_rows:
+            sid = row["session_id"]
+            if sid in steps_by_session:
+                steps_by_session[sid].append(_rec(row))
+
+        result_sessions = []
+        for session_row in sessions_rows:
+            session_dict = _rec(session_row)
+            sid = session_row["session_id"]
+            session_dict["steps"] = steps_by_session.get(sid, [])
+            session_dict["step_count"] = len(session_dict["steps"])
+            result_sessions.append(session_dict)
+
+        return {
+            "ip": ip,
+            "count": len(result_sessions),
+            "sessions": result_sessions,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/score/{ip}")
 async def score_ip(ip: str):
     try:
@@ -492,6 +555,49 @@ async def top_ips(limit: int = Query(10, ge=1, le=100)):
                 LIMIT  $1
             """, limit)
         return {"count": len(rows), "top_ips": _recs(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export/csv")
+async def export_db_csv():
+    """
+    Export all rows from all public base tables as a single CSV file.
+    Each row includes the source table and a JSON payload of the full row.
+    """
+    try:
+        async with _pool().acquire() as conn:
+            tables = await conn.fetch(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """
+            )
+
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["table_name", "row_json"])
+
+            for table in tables:
+                table_name = table["table_name"]
+                # table_name is sourced from information_schema to avoid untrusted input.
+                rows = await conn.fetch(f'SELECT * FROM "{table_name}"')
+                for row in rows:
+                    normalized = _rec(row)
+                    writer.writerow([
+                        table_name,
+                        json.dumps(normalized, default=str, ensure_ascii=True),
+                    ])
+
+        output.seek(0)
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        headers = {
+            "Content-Disposition": f'attachment; filename="honeycloud_db_export_{ts}.csv"'
+        }
+        return StreamingResponse(output, media_type="text/csv", headers=headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
