@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Attack, Session, SessionDetail, TopIP, Stats, ScoreResult, HealthStatus } from '../types'
+import type { Attack, Session, SessionDetail, TopIP, Stats, ScoreResult, HealthStatus, IPSessionsResponse } from '../types'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
@@ -28,3 +28,6 @@ export const getTopIPs = (limit = 10) =>
 
 export const scoreIP = (ip: string) =>
   api.get<ScoreResult>(`/score/${ip}`).then(r => r.data)
+
+export const getSessionsByIP = (ip: string, limit = 100) =>
+  api.get<IPSessionsResponse>(`/sessions/ip/${ip}`, { params: { limit } }).then(r => r.data)

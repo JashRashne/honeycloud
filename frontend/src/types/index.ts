@@ -34,6 +34,23 @@ export interface SessionDetail {
   events: (Attack & { command: string | null; password: string | null })[]
 }
 
+export interface SessionStep extends Attack {
+  password: string | null
+  command: string | null
+}
+
+export interface IPSession extends Session {
+  created_at: string
+  steps: SessionStep[]
+  step_count: number
+}
+
+export interface IPSessionsResponse {
+  ip: string
+  count: number
+  sessions: IPSession[]
+}
+
 export interface TopIP {
   src_ip: string
   total_events: number
