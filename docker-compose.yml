@@ -1,50 +1,46 @@
 services:
 
   # ── Init cowrie logs + rebuild pickle filesystem ─────────────
-  cowrie-init:
-    image: cowrie/cowrie:latest
-    container_name: honeycloud-cowrie-init
-    restart: "no"
-    volumes:
-      - cowrie-logs:/cowrie/var/log/cowrie
-      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
-      - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
-      - cowrie-data:/cowrie/cowrie-git/share/cowrie   # ✅ FIXED PATH
-    command: >
-      sh -c "
-        echo 'Setting up logs...' &&
-        mkdir -p /cowrie/var/log/cowrie &&
-        touch /cowrie/var/log/cowrie/cowrie.json &&
-        chmod 777 /cowrie/var/log/cowrie &&
-        chmod 666 /cowrie/var/log/cowrie/cowrie.json &&
 
-        echo 'Rebuilding filesystem pickle...' &&
-        cd /cowrie/cowrie-git &&
+  # cowrie-init:
+  #   image: cowrie/cowrie:latest
+  #   container_name: honeycloud-cowrie-init
+  #   restart: "no"
+  #   volumes:
+  #     - cowrie-logs:/cowrie/var/log/cowrie
+  #     - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+  #     - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
+  #     - cowrie-data:/cowrie/cowrie-git/share/cowrie   # ✅ FIXED PATH
+  #   command: >
+  #     sh -c "
+  #       echo 'Setting up logs...' &&
+  #       mkdir -p /cowrie/var/log/cowrie &&
+  #       touch /cowrie/var/log/cowrie/cowrie.json &&
+  #       chmod 777 /cowrie/var/log/cowrie &&
+  #       chmod 666 /cowrie/var/log/cowrie/cowrie.json &&
 
-        # ✅ GUARANTEED WORKING PATH
-        python3 cowrie/scripts/createfs.py &&
+  #       echo 'Rebuilding filesystem pickle...' &&
+  #       cd /cowrie/cowrie-git &&
 
-        echo 'Pickle built successfully'
-      "
+  #       # ✅ GUARANTEED WORKING PATH
+  #       python3 cowrie/scripts/createfs.py &&
+
+  #       echo 'Pickle built successfully'
+  #     "
 
   # ── Cowrie SSH Honeypot ─────────────────────────────────────
   cowrie:
     image: cowrie/cowrie:latest
     container_name: honeycloud-cowrie
     restart: unless-stopped
-    depends_on:
-      cowrie-init:
-        condition: service_completed_successfully
     ports:
       - "2222:2222"
     volumes:
-      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie   # ✅ unchanged
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie   # KEEP THIS (you said correct)
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
-      - cowrie-data:/cowrie/cowrie-git/share/cowrie     # ✅ FIXED PATH
     environment:
       - COWRIE_TELNET_ENABLED=no
-
   # ── Collector ───────────────────────────────────────────────
   collector:
     build: .
