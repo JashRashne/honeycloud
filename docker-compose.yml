@@ -1,17 +1,26 @@
 services:
 
-  # ── Init cowrie logs volume permissions ─────────────────────
+  # ── Init cowrie logs + rebuild pickle filesystem ─────────────
   cowrie-init:
-    image: busybox:1.36
+    image: cowrie/cowrie:latest
     container_name: honeycloud-cowrie-init
     restart: "no"
     volumes:
-      - cowrie-logs:/logs
+      - cowrie-logs:/cowrie/var/log/cowrie
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
+      - cowrie-data:/cowrie/cowrie-git/var/lib/cowrie
     command: >
-      sh -c "mkdir -p /logs &&
-             touch /logs/cowrie.json &&
-             chmod 777 /logs &&
-             chmod 666 /logs/cowrie.json"
+      sh -c "
+        mkdir -p /cowrie/var/log/cowrie &&
+        touch /cowrie/var/log/cowrie/cowrie.json &&
+        chmod 777 /cowrie/var/log/cowrie &&
+        chmod 666 /cowrie/var/log/cowrie/cowrie.json &&
+        echo 'Rebuilding filesystem pickle from honeyfs...' &&
+        cd /cowrie/cowrie-git &&
+        python bin/createfs.py -d honeyfs -o /cowrie/cowrie-git/share/cowrie/fs.pickle &&
+        echo 'Pickle built successfully'
+      "
 
   # ── Cowrie SSH Honeypot ─────────────────────────────────────
   cowrie:
@@ -24,18 +33,13 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie # <--- THIS is the official internal path
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
-
+      - cowrie-data:/cowrie/cowrie-git/var/lib/cowrie
     environment:
-      - COWRIE_OUTPUT_JSON_ENABLED=yes  # <--- THIS IS THE KEY!
-      - COWRIE_LOG_JSON_FILE=/cowrie/var/log/cowrie/cowrie.json
       - COWRIE_TELNET_ENABLED=no
-      - COWRIE_HONEYPOT_HOSTNAME=prod-srv-01
-      - COWRIE_HONEYPOT_KERNEL_VERSION=5.15.0-101-generic
-      - "COWRIE_HONEYPOT_KERNEL_BUILD_STRING=#1 SMP Tue Feb 11 19:10:02 UTC 2026"
-      - "COWRIE_SSH_VERSION=SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.6"
+
   # ── Collector ───────────────────────────────────────────────
   collector:
     build: .
@@ -77,3 +81,6 @@ volumes:
       type: 'none'
       o: 'bind'
       device: '/home/jash/honeycloud/cowrie/var/log/cowrie'
+
+  cowrie-data:
+    name: honeycloud-cowrie-data
