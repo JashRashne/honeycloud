@@ -1,0 +1,13 @@
+#!/bin/sh
+
+case "$1" in
+    /var/www/html* )
+        echo "index.html  .env"
+        ;;
+    /var/www* )
+        echo "html  README.txt"
+        ;;
+    * )
+        /bin/ls "$@"
+        ;;
+esac
