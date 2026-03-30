@@ -9,16 +9,21 @@ services:
       - cowrie-logs:/cowrie/var/log/cowrie
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
-      - cowrie-data:/cowrie/cowrie-git/var/lib/cowrie
+      - cowrie-data:/cowrie/cowrie-git/share/cowrie   # ✅ FIXED PATH
     command: >
       sh -c "
+        echo 'Setting up logs...' &&
         mkdir -p /cowrie/var/log/cowrie &&
         touch /cowrie/var/log/cowrie/cowrie.json &&
         chmod 777 /cowrie/var/log/cowrie &&
         chmod 666 /cowrie/var/log/cowrie/cowrie.json &&
+
         echo 'Rebuilding filesystem pickle from honeyfs...' &&
         cd /cowrie/cowrie-git &&
-        python bin/createfs.py -d honeyfs -o /cowrie/cowrie-git/share/cowrie/fs.pickle &&
+
+        # ✅ FIXED COMMAND (this was breaking)
+        python3 -m cowrie.scripts.createfs &&
+
         echo 'Pickle built successfully'
       "
 
@@ -33,10 +38,10 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie   # ✅ unchanged
       - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
       - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro
-      - cowrie-data:/cowrie/cowrie-git/var/lib/cowrie
+      - cowrie-data:/cowrie/cowrie-git/share/cowrie     # ✅ FIXED PATH
     environment:
       - COWRIE_TELNET_ENABLED=no
 
