@@ -1,3 +1,5 @@
-- Fix the nginx config on the staging server
-- Update the postgres password (currently: HoneyCloud2026!)
-- Backup the /var/www/html folder
+TODO:
+- rotate DB password (current: Pr0d#S3cur3P@ssw0rd!)
+- update SSL cert before expiry (Apr 2026)
+- migrate old backups from /opt/backups to S3
+- ask team to stop using root login

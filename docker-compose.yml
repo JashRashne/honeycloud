@@ -29,6 +29,9 @@ services:
       - ./cowrie/honeyfs/etc/hosts:/cowrie/cowrie-git/honeyfs/etc/hosts:ro
       - ./cowrie/honeyfs/etc/issue:/cowrie/cowrie-git/honeyfs/etc/issue:ro
       - ./cowrie/honeyfs/etc/crontab:/cowrie/cowrie-git/honeyfs/etc/crontab:ro
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/honeyfs:/cowrie/cowrie-git/honeyfs:ro   # mount entire honeyfs
+
     environment:
       - COWRIE_OUTPUT_JSON_ENABLED=yes  # <--- THIS IS THE KEY!
       - COWRIE_LOG_JSON_FILE=/cowrie/var/log/cowrie/cowrie.json

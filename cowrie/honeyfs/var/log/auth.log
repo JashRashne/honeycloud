@@ -1,0 +1,5 @@
+Mar 23 10:14:22 prod-srv-01 sshd[1337]: Accepted publickey for jash from 10.0.0.4 port 52341 ssh2
+Mar 23 10:14:22 prod-srv-01 sshd[1337]: pam_unix(sshd:session): session opened for user jash
+Mar 24 02:31:07 prod-srv-01 sshd[2891]: Failed password for root from 45.33.32.156 port 41233 ssh2
+Mar 24 02:31:09 prod-srv-01 sshd[2891]: Failed password for root from 45.33.32.156 port 41235 ssh2
+Mar 25 14:22:11 prod-srv-01 sudo: jash : TTY=pts/0 ; PWD=/home/jash ; USER=root ; COMMAND=/usr/bin/apt-get update
