@@ -1,4 +1,11 @@
 127.0.0.1       localhost
-136.112.225.237 prod-srv-01
-10.0.0.5        db-prod-internal  # DO NOT SSH WITHOUT VPN
-10.0.0.6        backup-server-01
+127.0.1.1       prod-srv-01
+10.0.0.1        prod-srv-01
+10.0.0.5        db-server-01
+10.0.0.6        redis-01
+10.0.0.10       monitoring-01
+
+# The following lines are desirable for IPv6 capable hosts
+::1     localhost ip6-localhost ip6-loopback
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters

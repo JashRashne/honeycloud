@@ -1,5 +1,9 @@
-Mar 23 10:14:22 prod-srv-01 sshd[1337]: Accepted publickey for jash from 10.0.0.4 port 52341 ssh2
-Mar 23 10:14:22 prod-srv-01 sshd[1337]: pam_unix(sshd:session): session opened for user jash
-Mar 24 02:31:07 prod-srv-01 sshd[2891]: Failed password for root from 45.33.32.156 port 41233 ssh2
-Mar 24 02:31:09 prod-srv-01 sshd[2891]: Failed password for root from 45.33.32.156 port 41235 ssh2
-Mar 25 14:22:11 prod-srv-01 sudo: jash : TTY=pts/0 ; PWD=/home/jash ; USER=root ; COMMAND=/usr/bin/apt-get update
+Mar 28 10:14:22 prod-srv-01 sshd[1337]: Accepted publickey for jash from 10.0.0.4 port 54832 ssh2
+Mar 28 10:14:22 prod-srv-01 sshd[1337]: pam_unix(sshd:session): session opened for user jash by (uid=0)
+Mar 28 10:14:55 prod-srv-01 sshd[1337]: pam_unix(sshd:session): session closed for user jash
+Mar 29 02:31:07 prod-srv-01 sshd[2891]: Failed password for root from 45.33.32.156 port 41822 ssh2
+Mar 29 02:31:09 prod-srv-01 sshd[2892]: Failed password for root from 45.33.32.156 port 41823 ssh2
+Mar 29 02:31:12 prod-srv-01 sshd[2893]: Failed password for admin from 45.33.32.156 port 41824 ssh2
+Mar 29 14:22:11 prod-srv-01 sudo: jash : TTY=pts/0 ; PWD=/home/jash ; USER=root ; COMMAND=/bin/systemctl restart nginx
+Mar 30 08:01:33 prod-srv-01 sshd[3201]: Accepted password for root from 10.0.0.4 port 52100 ssh2
+Mar 30 08:01:33 prod-srv-01 sshd[3201]: pam_unix(sshd:session): session opened for user root by (uid=0)

@@ -1,2 +1,4 @@
-Web root moved to /var/www/html
-Check .env for configuration
+Production web server
+Managed by: ops team
+Last updated: 2026-03-01
+Contact: ops@company.internal

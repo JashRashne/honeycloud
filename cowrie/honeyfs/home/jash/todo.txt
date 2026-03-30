@@ -1,5 +1,7 @@
-TODO:
-- rotate DB password (current: Pr0d#S3cur3P@ssw0rd!)
-- update SSL cert before expiry (Apr 2026)
-- migrate old backups from /opt/backups to S3
-- ask team to stop using root login
+TODO (personal reminders):
+- rotate DB password — current one is Pr0d#S3cur3P@ssw0rd! (set 6 months ago, overdue)
+- update SSL cert before expiry Apr 14 2026
+- migrate old backups from /opt/backups to S3 prod-srv-backups bucket
+- ask team to stop using root login directly
+- set up fail2ban properly
+- check if monitoring-01 is still sending alerts to PagerDuty
