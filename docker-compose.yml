@@ -18,11 +18,11 @@ services:
         chmod 777 /cowrie/var/log/cowrie &&
         chmod 666 /cowrie/var/log/cowrie/cowrie.json &&
 
-        echo 'Rebuilding filesystem pickle from honeyfs...' &&
+        echo 'Rebuilding filesystem pickle...' &&
         cd /cowrie/cowrie-git &&
 
-        # ✅ FIXED COMMAND (this was breaking)
-        python3 -m cowrie.scripts.createfs &&
+        # ✅ GUARANTEED WORKING PATH
+        python3 cowrie/scripts/createfs.py &&
 
         echo 'Pickle built successfully'
       "
