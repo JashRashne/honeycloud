@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
-import json
 import os
 import sys
+import zipfile
 from datetime import datetime, timezone
 from typing import Any
 
@@ -559,12 +559,11 @@ async def top_ips(limit: int = Query(10, ge=1, le=100)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-#export csv of db
 @app.get("/api/export/csv")
 async def export_db_csv():
     """
-    Export all rows from all public base tables as a single CSV file.
-    Each row includes the source table and a JSON payload of the full row.
+    Export all public tables as a ZIP file with one CSV per table.
+    Each CSV contains the table's real columns as headers.
     """
     try:
         async with _pool().acquire() as conn:
@@ -578,27 +577,44 @@ async def export_db_csv():
                 """
             )
 
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow(["table_name", "row_json"])
+            zip_buffer = io.BytesIO()
 
-            for table in tables:
-                table_name = table["table_name"]
-                # table_name is sourced from information_schema to avoid untrusted input.
-                rows = await conn.fetch(f'SELECT * FROM "{table_name}"')
-                for row in rows:
-                    normalized = _rec(row)
-                    writer.writerow([
+            with zipfile.ZipFile(
+                zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED
+            ) as zf:
+                for table in tables:
+                    table_name = table["table_name"]
+
+                    col_rows = await conn.fetch(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = $1
+                        ORDER BY ordinal_position
+                        """,
                         table_name,
-                        json.dumps(normalized, default=str, ensure_ascii=True),
-                    ])
+                    )
+                    fieldnames = [c["column_name"] for c in col_rows]
+                    if not fieldnames:
+                        continue
 
-        output.seek(0)
+                    rows = await conn.fetch(f'SELECT * FROM "{table_name}"')
+
+                    csv_buffer = io.StringIO()
+                    writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow(_rec(row))
+
+                    zf.writestr(f"{table_name}.csv", csv_buffer.getvalue())
+
+        zip_buffer.seek(0)
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         headers = {
-            "Content-Disposition": f'attachment; filename="honeycloud_db_export_{ts}.csv"'
+            "Content-Disposition": f'attachment; filename="honeycloud_db_export_{ts}.zip"'
         }
-        return StreamingResponse(output, media_type="text/csv", headers=headers)
+        return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

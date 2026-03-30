@@ -12,3 +12,4 @@ data/cowrie-logs/*
 layer2/models/*.pkl
 
 .env
+temp.csv
